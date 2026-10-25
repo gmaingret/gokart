@@ -13,6 +13,9 @@ import { createRelay } from './src/relay.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8080;
+// Address phones should use, e.g. http://192.168.1.42:8080. Needed when running
+// in Docker, where the server only sees the container's internal IP.
+const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const THREE_DIR = path.join(__dirname, 'node_modules', 'three', 'build');
 
@@ -74,7 +77,7 @@ const server = http.createServer(async (req, res) => {
   if (p === '/play' || p === '/play/' || p === '/p') return sendFile(res, path.join(PUBLIC_DIR, 'controller', 'index.html'));
 
   if (p === '/api/info') {
-    const body = JSON.stringify({ port: PORT, addresses: lanAddresses(), rooms: relay.roomCodes() });
+    const body = JSON.stringify({ port: PORT, publicUrl: PUBLIC_URL || null, addresses: lanAddresses(), rooms: relay.roomCodes() });
     res.writeHead(200, { 'content-type': MIME['.json'], 'cache-control': 'no-store' });
     return res.end(body);
   }
@@ -125,11 +128,11 @@ setInterval(() => {
 
 server.listen(PORT, '0.0.0.0', () => {
   const addrs = lanAddresses();
-  const ip = addrs[0]?.address || 'localhost';
+  const base = PUBLIC_URL || `http://${addrs[0]?.address || 'localhost'}:${PORT}`;
   console.log('\n  GoKart is running!\n');
-  console.log(`  TV  : open  http://${ip}:${PORT}/   in the TV browser`);
-  console.log(`  Phone: open http://${ip}:${PORT}/play  (or scan the QR code on the TV)\n`);
-  if (addrs.length > 1) {
+  console.log(`  TV  : open  ${base}/   in the TV browser`);
+  console.log(`  Phone: open ${base}/play  (or scan the QR code on the TV)\n`);
+  if (!PUBLIC_URL && addrs.length > 1) {
     console.log('  Other addresses: ' + addrs.slice(1).map((a) => `${a.address} (${a.name})`).join(', ') + '\n');
   }
 });

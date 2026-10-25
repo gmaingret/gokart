@@ -1,0 +1,12 @@
+services:
+  gokart:
+    build: .
+    image: gokart
+    container_name: gokart
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # The address phones use to reach this server (put it in the QR code).
+      # Replace with your server's LAN IP or hostname.
+      PUBLIC_URL: "http://192.168.1.42:8080"

@@ -11,6 +11,10 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
   mushroom, triple mushroom, star and lightning
 - 50cc / 100cc / 150cc, 1–7 laps, cup points that carry across races
+- Hilly themed worlds with scenery, grandstand crowds, neon city skyline at night, sky with clouds and weather
+- Particle effects: drift sparks, tyre smoke, dust, boost flames, item explosions, confetti
+- Synthesized sound: engines with gear shifts, tyre screech, layered effects and an original soundtrack
+  per track (speeds up on the final lap, switches to a star theme with star power)
 - Phones vibrate when you get hit, grab an item or boost (Android)
 - Drop-in reconnects: a phone or the TV can reload mid-race and pick up where it was
 
@@ -91,6 +95,7 @@ so on a plain-http home network use slide steering there.
 ## TV / keyboard controls
 
 - TV remote in the lobby: ▲▼ choose a setting, ◀▶ change it, OK starts the race; OK on the results screen continues.
+- **Graphics: Low** in the lobby setup trades effects and resolution for speed — use it if the TV browser stutters.
 - **K** adds a keyboard racer (arrows/WASD, Space to drift, X to use an item) — handy for testing without phones.
 - **Esc** ends the current race.
 

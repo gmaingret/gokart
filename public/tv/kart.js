@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF, CURB, WALL } from './track.js';
 
 export const KART_RADIUS = 1.3;
-const DRIFT_TIERS = [
+export const DRIFT_TIERS = [
   { at: 0.9, boost: 0.6, color: 0x3fa9ff },
   { at: 2.0, boost: 1.0, color: 0xff9a1f },
   { at: 3.3, boost: 1.5, color: 0xff3fd2 },
@@ -30,96 +31,194 @@ function nameTag(text, color) {
   return s;
 }
 
+function plateTexture(letter, color) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.arc(64, 64, 60, 0, Math.PI * 2);
+  g.fill();
+  g.lineWidth = 10;
+  g.strokeStyle = color;
+  g.stroke();
+  g.fillStyle = '#111';
+  g.font = '900 78px system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(letter, 64, 70);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+let shadowTex = null;
+function blobShadowTexture() {
+  if (shadowTex) return shadowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(0,0,0,0.75)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 64);
+  shadowTex = new THREE.CanvasTexture(c);
+  return shadowTex;
+}
+
+// Side profile of the body (z forward, y up), extruded across the kart's width.
+function bodyGeometry() {
+  const s = new THREE.Shape();
+  s.moveTo(-1.35, 0.22);
+  s.lineTo(-1.4, 0.7);
+  s.quadraticCurveTo(-1.2, 0.92, -0.85, 0.88);
+  s.lineTo(-0.55, 0.62);
+  s.lineTo(0.55, 0.62);
+  s.quadraticCurveTo(0.9, 0.72, 1.2, 0.6);
+  s.quadraticCurveTo(1.85, 0.45, 2.0, 0.3);
+  s.lineTo(1.9, 0.2);
+  s.lineTo(-1.35, 0.22);
+  const depth = 1.1;
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelSize: 0.16, bevelThickness: 0.18, bevelSegments: 3, curveSegments: 10 });
+  // shape (x, y) + extrusion z  ->  kart (z, y) + width x
+  g.rotateY(-Math.PI / 2);
+  g.translate(depth / 2, 0, 0);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Collects transformed part geometries per material bucket and merges them, so a
+// whole kart renders in about a dozen draw calls instead of ~50.
+class PartBuilder {
+  constructor() {
+    this.buckets = new Map();
+    this.m = new THREE.Matrix4();
+    this.e = new THREE.Euler();
+    this.q = new THREE.Quaternion();
+  }
+  add(bucket, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, color = null, scale = null) {
+    let g = geo.index ? geo.toNonIndexed() : geo.clone();
+    for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal') g.deleteAttribute(name);
+    this.q.setFromEuler(this.e.set(rx, ry, rz));
+    this.m.compose(new THREE.Vector3(x, y, z), this.q, scale || new THREE.Vector3(1, 1, 1));
+    g.applyMatrix4(this.m);
+    if (color !== null) {
+      const c = new THREE.Color(color);
+      const n = g.attributes.position.count;
+      const arr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) ((arr[i * 3] = c.r), (arr[i * 3 + 1] = c.g), (arr[i * 3 + 2] = c.b));
+      g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    }
+    if (!this.buckets.has(bucket)) this.buckets.set(bucket, []);
+    this.buckets.get(bucket).push(g);
+    geo.dispose();
+  }
+  mesh(bucket, material) {
+    const list = this.buckets.get(bucket);
+    const geo = mergeGeometries(list);
+    list.forEach((g) => g.dispose());
+    return new THREE.Mesh(geo, material);
+  }
+}
+
+let lowQuality = false;
+export function setLowQuality(on) {
+  lowQuality = on;
+}
+
 function buildModel(driver, name) {
   const root = new THREE.Group();
   const body = new THREE.Group(); // tilts / spins; root carries position + heading
   root.add(body);
-  const lam = (color, o = {}) => new THREE.MeshLambertMaterial({ color, ...o });
-  const paint = lam(driver.color);
-  const dark = lam(0x222222);
-  const accent = lam(driver.accent);
+  const std = (color, metalness = 0.3, roughness = 0.4, o = {}) =>
+    lowQuality ? new THREE.MeshLambertMaterial({ color, ...o }) : new THREE.MeshStandardMaterial({ color, metalness, roughness, ...o });
+  const paint = std(driver.color, 0.45, 0.28);
+  const trim = std(0xffffff, 0.3, 0.5, { vertexColors: true });
+  const chrome = std(0xffffff, 1, 0.18);
+  const visorMat = std(0x0a0a14, 0.9, 0.06, { side: THREE.DoubleSide });
+  const ACC = driver.accent, DARK = 0x1b1d22;
+  const b = new PartBuilder();
 
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.45, 2.7), paint);
-  chassis.position.y = 0.55;
-  body.add(chassis);
-  const nose = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.35, 0.9), paint);
-  nose.position.set(0, 0.5, 1.6);
-  body.add(nose);
-  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.25, 0.3), dark);
-  bumper.position.set(0, 0.4, 2.1);
-  body.add(bumper);
-  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 0.5), accent);
-  spoiler.position.set(0, 1.25, -1.35);
-  body.add(spoiler);
-  for (const sx of [-0.6, 0.6]) {
-    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), dark);
-    strut.position.set(sx, 0.95, -1.35);
-    body.add(strut);
+  b.add('paint', bodyGeometry());
+  // floor pan + side pods
+  b.add('trim', new THREE.BoxGeometry(1.9, 0.12, 3.0), 0, 0.2, 0.1, 0, 0, 0, DARK);
+  for (const sx of [-1, 1]) b.add('trim', new THREE.CapsuleGeometry(0.26, 1.5, 4, 10), sx * 0.92, 0.42, -0.05, Math.PI / 2, 0, 0, ACC);
+  // front wing with end plates
+  b.add('trim', new THREE.BoxGeometry(2.2, 0.08, 0.5), 0, 0.26, 2.0, 0, 0, 0, ACC);
+  for (const sx of [-1, 1]) b.add('paint', new THREE.BoxGeometry(0.06, 0.3, 0.55), sx * 1.1, 0.34, 2.0);
+  // rear wing
+  b.add('trim', new THREE.BoxGeometry(2.0, 0.1, 0.6), 0, 1.42, -1.5, -0.12, 0, 0, ACC);
+  for (const sx of [-1, 1]) {
+    b.add('paint', new THREE.BoxGeometry(0.07, 0.5, 0.7), sx * 1.0, 1.35, -1.5);
+    b.add('trim', new THREE.BoxGeometry(0.08, 0.6, 0.08), sx * 0.45, 1.05, -1.45, 0, 0, 0, DARK);
   }
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.25), dark);
-  seat.position.set(0, 1.0, -0.75);
-  body.add(seat);
-  const wheelBar = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 12), dark);
-  wheelBar.rotation.x = Math.PI / 2.6;
-  wheelBar.position.set(0, 1.1, 0.55);
-  body.add(wheelBar);
-
+  // engine + exhausts
+  b.add('trim', new THREE.BoxGeometry(0.95, 0.5, 0.65), 0, 0.78, -1.15, 0, 0, 0, DARK);
+  b.add('chrome', new THREE.CylinderGeometry(0.42, 0.42, 0.7, 12), 0, 1.0, -1.1, 0, 0, Math.PI / 2, null, new THREE.Vector3(1, 1, 0.5));
+  const exhausts = [];
+  for (const sx of [-0.32, 0.32]) {
+    b.add('chrome', new THREE.CylinderGeometry(0.11, 0.13, 0.6, 10), sx, 0.78, -1.6, Math.PI / 2 - 0.25);
+    exhausts.push(new THREE.Vector3(sx, 0.85, -1.95));
+  }
+  // steering wheel + column
+  b.add('trim', new THREE.TorusGeometry(0.24, 0.05, 6, 16), 0, 1.05, 0.45, -0.7, 0, 0, DARK);
+  b.add('trim', new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), 0, 0.85, 0.65, 0.9, 0, 0, DARK);
   // Driver
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.8, 10), accent);
-  torso.position.set(0, 1.2, -0.35);
-  body.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), paint);
-  head.position.set(0, 1.85, -0.3);
-  body.add(head);
-  const visor = new THREE.Mesh(
-    new THREE.SphereGeometry(0.36, 12, 8, -Math.PI / 2.4, Math.PI / 1.2, Math.PI / 3, Math.PI / 3),
-    lam(0x111111, { side: THREE.DoubleSide })
-  );
-  visor.position.copy(head.position).add(new THREE.Vector3(0, 0, 0.1));
-  body.add(visor);
+  b.add('trim', new THREE.CapsuleGeometry(0.34, 0.45, 4, 10), 0, 1.15, -0.45, -0.15, 0, 0, ACC);
+  for (const sx of [-1, 1]) b.add('trim', new THREE.CapsuleGeometry(0.1, 0.55, 3, 6), sx * 0.28, 1.12, -0.05, 1.1, 0, -sx * 0.35, ACC);
+  b.add('paint', new THREE.SphereGeometry(0.42, 20, 14), 0, 1.78, -0.42);
+  b.add('trim', new THREE.TorusGeometry(0.42, 0.045, 6, 24), 0, 1.8, -0.42, Math.PI / 2 - 0.2, 0, 0, 0xffffff);
+  b.add('visor', new THREE.SphereGeometry(0.36, 16, 10, -Math.PI / 2.6, Math.PI / 1.3, Math.PI / 2.9, Math.PI / 3.6), 0, 1.78, -0.32);
 
+  body.add(b.mesh('paint', paint), b.mesh('trim', trim), b.mesh('chrome', chrome), b.mesh('visor', visorMat));
+  // number plate on the nose (textured, so it stays its own mesh)
+  const plate = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), new THREE.MeshStandardMaterial({ map: plateTexture(name[0]?.toUpperCase() || '?', driver.color), roughness: 0.5 }));
+  plate.position.set(0, 0.82, 1.15);
+  plate.rotation.x = -Math.PI / 2 + 0.28;
+  body.add(plate);
+
+  // Wheels: tyre, rim and spokes merged into one vertex-coloured mesh each.
+  const wheelMat = std(0xffffff, 0.55, 0.45, { vertexColors: true });
   const wheels = [];
-  const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.42, 14).rotateZ(Math.PI / 2);
-  const hubGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.44, 8).rotateZ(Math.PI / 2);
-  for (const [x, z, front] of [[-0.98, 1.0, 1], [0.98, 1.0, 1], [-1.0, -0.95, 0], [1.0, -0.95, 0]]) {
-    const w = new THREE.Group();
-    w.add(new THREE.Mesh(wheelGeo, dark));
-    w.add(new THREE.Mesh(hubGeo, accent));
-    w.position.set(x, 0.42, z);
-    w.userData.front = !!front;
-    body.add(w);
-    wheels.push(w);
+  for (const [x, z, front] of [[-1.0, 1.15, 1], [1.0, 1.15, 1], [-1.05, -0.95, 0], [1.05, -0.95, 0]]) {
+    const r = front ? 0.4 : 0.47, w = front ? 0.38 : 0.5;
+    const wb = new PartBuilder();
+    wb.add('w', new THREE.CylinderGeometry(r, r, w, 22), 0, 0, 0, 0, 0, Math.PI / 2, 0x161616);
+    wb.add('w', new THREE.TorusGeometry(r * 0.98, 0.04, 4, 22), x > 0 ? w / 2 : -w / 2, 0, 0, 0, Math.PI / 2, 0, 0x101010);
+    wb.add('w', new THREE.CylinderGeometry(r * 0.6, r * 0.6, w + 0.02, 14), 0, 0, 0, 0, 0, Math.PI / 2, 0xd8d8d8);
+    for (let k = 0; k < 3; k++) wb.add('w', new THREE.BoxGeometry(w + 0.04, r * 1.1, 0.08), 0, 0, 0, (k / 3) * Math.PI, 0, 0, ACC);
+    const spin = wb.mesh('w', wheelMat);
+    const wg = new THREE.Group();
+    wg.add(spin);
+    wg.position.set(x, r, z);
+    wg.userData.front = !!front;
+    wg.userData.spin = spin;
+    body.add(wg);
+    wheels.push(wg);
   }
 
-  const flame = new THREE.Mesh(
-    new THREE.ConeGeometry(0.3, 1.4, 8).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0xffa020, transparent: true, opacity: 0.9 })
-  );
-  flame.position.set(0, 0.6, -1.9);
-  flame.visible = false;
-  body.add(flame);
-
-  const sparks = [];
-  for (const x of [-1, 1]) {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    s.position.set(x, 0.25, -1.3);
-    s.visible = false;
-    body.add(s);
-    sparks.push(s);
-  }
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  const flameGeo = new THREE.ConeGeometry(0.16, 0.9, 8).rotateX(-Math.PI / 2).translate(0, 0, -0.45);
+  const flames = exhausts.map((p) => {
+    const f = new THREE.Mesh(flameGeo, flameMat);
+    f.position.copy(p);
+    f.visible = false;
+    body.add(f);
+    return f;
+  });
 
   const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(1.7, 16).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false })
+    new THREE.PlaneGeometry(3.4, 4.6).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: blobShadowTexture(), transparent: true, depthWrite: false })
   );
-  shadow.position.y = 0.07;
-  shadow.scale.z = 1.3;
+  shadow.position.y = 0.08;
   root.add(shadow);
 
   const tag = nameTag(name, driver.color);
   root.add(tag);
 
-  return { root, body, wheels, flame, sparks, tag, paint };
+  return { root, body, wheels, flames, exhausts, tag, paint, shadow };
 }
 
 export class Kart {
@@ -313,31 +412,35 @@ export class Kart {
     m.root.position.set(this.x, 0, this.z);
     m.root.rotation.y = this.heading;
     const hopY = this.hop > 0 ? Math.sin((this.hop / 0.28) * Math.PI) * 0.5 : 0;
-    m.body.position.y = hopY;
+    // Engine rumble + bumpy suspension.
+    const rumble = Math.sin(time * 38 + this.x) * 0.012 * (this.offroad ? 4 : 1) * Math.min(1, Math.abs(this.speed) / 5 + 0.3);
+    m.body.position.y = hopY + rumble;
     m.body.rotation.y = (this.drifting ? this.driftDir * -0.38 : 0) + this.spinAngle;
-    m.body.rotation.z = this.drifting ? this.driftDir * 0.06 : -this.steer * 0.04;
+    m.body.rotation.z = this.drifting ? this.driftDir * 0.07 : -this.steer * 0.05 * Math.min(1, Math.abs(this.speed) / 10);
+    // Squat under acceleration / boost.
+    m.body.rotation.x = this.boost > 0 ? -0.05 : 0;
     const sc = this.shrink > 0 ? 0.6 : 1;
     m.body.scale.setScalar(sc);
-    const roll = (this.speed * dt) / 0.42;
+    m.shadow.scale.setScalar(sc * (1 - hopY * 0.4));
+    const roll = (this.speed * dt) / 0.44;
     for (const w of m.wheels) {
-      w.children[0].rotation.x += roll;
-      w.children[1].rotation.x += roll;
+      w.userData.spin.rotation.x += roll;
       if (w.userData.front) w.rotation.y = -this.steer * 0.45;
     }
-    m.flame.visible = this.boost > 0;
-    if (m.flame.visible) m.flame.scale.set(1, 1, 0.7 + Math.random() * 0.6);
-    const tier = this.drifting ? this.driftTier() : -1;
-    for (const s of m.sparks) {
-      s.visible = tier >= 0 && Math.random() > 0.2;
-      if (s.visible) {
-        s.material.color.setHex(DRIFT_TIERS[tier].color);
-        s.scale.setScalar(0.7 + Math.random() * 0.8);
-      }
+    for (const f of m.flames) {
+      f.visible = this.boost > 0;
+      if (f.visible) f.scale.set(1, 1, 0.6 + Math.random() * 0.8);
     }
     if (this.star > 0) m.paint.color.setHSL((time * 2.5) % 1, 0.9, 0.55);
     else m.paint.color.set(this.driver.color);
     // Blink while invulnerable after a hit.
     m.body.visible = this.invuln > 0 && this.spin <= 0 ? Math.floor(time * 16) % 2 === 0 : true;
+  }
+
+  // World position of a point given in the kart's local frame.
+  toWorld(lx, ly, lz) {
+    const c = Math.cos(this.heading), s = Math.sin(this.heading);
+    return { x: this.x + lx * c + lz * s, y: ly, z: this.z - lx * s + lz * c };
   }
 }
 

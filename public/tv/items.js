@@ -70,31 +70,45 @@ function bananaMesh() {
 function shellMesh(color) {
   const g = new THREE.Group();
   const top = new THREE.Mesh(
-    new THREE.SphereGeometry(0.75, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-    new THREE.MeshLambertMaterial({ color, flatShading: true })
+    new THREE.SphereGeometry(0.75, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.25, metalness: 0.1, emissive: color, emissiveIntensity: 0.25 })
   );
   top.position.y = 0.35;
   g.add(top);
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.7, 0.3, 14), new THREE.MeshLambertMaterial({ color: 0xffffff }));
-  rim.position.y = 0.3;
+  // hex plates
+  const plates = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.78, 1),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.55 })
+  );
+  plates.scale.y = 0.6;
+  plates.position.y = 0.35;
+  g.add(plates);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.76, 0.14, 8, 20).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }));
+  rim.position.y = 0.32;
   g.add(rim);
   return g;
 }
 
 export class Items {
-  constructor(scene, track, sfx) {
+  constructor(scene, track, sfx, fx) {
     this.scene = scene;
     this.track = track;
     this.sfx = sfx;
+    this.fx = fx;
     this.group = new THREE.Group();
     scene.add(this.group);
     this.objects = [];
     this.boxes = [];
     const tex = questionTexture();
-    const mat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, opacity: 0.92 });
-    const geo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+    // Shared materials so the rainbow shimmer is one update per frame.
+    this.boxShell = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, roughness: 0.05, metalness: 0.2, emissive: 0xff66cc, emissiveIntensity: 0.6, depthWrite: false });
+    const inner = new THREE.MeshBasicMaterial({ map: tex });
+    const geo = new THREE.BoxGeometry(1.7, 1.7, 1.7);
+    const innerGeo = new THREE.BoxGeometry(1.05, 1.05, 1.05);
     for (const s of track.boxSpots) {
-      const mesh = new THREE.Mesh(geo, mat);
+      const mesh = new THREE.Group();
+      mesh.add(new THREE.Mesh(innerGeo, inner));
+      mesh.add(new THREE.Mesh(geo, this.boxShell));
       mesh.position.set(s.x, 1.3, s.z);
       mesh.rotation.set(0.6, Math.random() * 6, 0.6);
       this.group.add(mesh);
@@ -191,6 +205,7 @@ export class Items {
 
   update(dt, karts, order, time) {
     const cl = this.track.cl;
+    this.boxShell.emissive.setHSL((time * 0.25) % 1, 1, 0.5);
     // Item boxes.
     for (const b of this.boxes) {
       if (b.wait > 0) {
@@ -201,6 +216,7 @@ export class Items {
         continue;
       }
       b.mesh.rotation.y += dt * 1.5;
+      b.mesh.rotation.x += dt * 0.7;
       b.mesh.position.y = 1.3 + Math.sin(time * 2 + b.x) * 0.2;
       for (const k of karts) {
         const dx = k.x - b.x, dz = k.z - b.z;
@@ -259,6 +275,7 @@ export class Items {
           }
         }
         o.mesh.rotation.y += dt * 12;
+        if (this.fx && Math.random() < 0.8) this.fx.trail(o.x, 0.5, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
       }
       o.mesh.position.set(o.x, 0, o.z);
 
@@ -268,8 +285,9 @@ export class Items {
         const dx = k.x - o.x, dz = k.z - o.z;
         const r = KART_RADIUS * (k.shrink > 0 ? 0.6 : 1) + 0.6;
         if (dx * dx + dz * dz < r * r) {
-          if (k.hit()) this.sfx('hit');
+          if (k.hit()) this.sfx(o.type === 'banana' ? 'slip' : 'hit');
           else if (k.star > 0) this.sfx('bump');
+          this.boom(o);
           this.remove(o);
           break;
         }
@@ -280,14 +298,21 @@ export class Items {
         if (p === o || p.dead) continue;
         const dx = p.x - o.x, dz = p.z - o.z;
         if (dx * dx + dz * dz < 1.6 * 1.6) {
+          this.boom(o);
           this.remove(o);
           this.remove(p);
-          this.sfx('bump');
+          this.sfx('explode');
           break;
         }
       }
     }
     this.objects = this.objects.filter((o) => !o.dead);
+  }
+
+  boom(o) {
+    if (!this.fx) return;
+    if (o.type === 'banana') this.fx.burst(o.x, 0.8, o.z, [0xffe14d, 0xfff7c2], 12, 5, 0);
+    else this.fx.explosion(o.x, 0, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
   }
 
   steerRed(o, dt, order) {

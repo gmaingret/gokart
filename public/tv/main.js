@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { DRIVERS, TRACK_NAMES, CC_OPTIONS, MAX_RACERS, POINTS, ordinal } from '../shared/config.js';
 import { buildTrack, TRACKS } from './track.js';
-import { Kart, collideKarts } from './kart.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Kart, collideKarts, DRIFT_TIERS, setLowQuality } from './kart.js';
+import { FX } from './fx.js';
+import { Sky } from './sky.js';
 import { Items } from './items.js';
 import { driveBot, botSpeedMult } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
@@ -17,7 +20,15 @@ const COUNTDOWN = 4;
 const $ = (id) => document.getElementById(id);
 
 // ---------------------------------------------------------------- state
-const cfg = { track: 0, laps: 3, cc: 100, bots: 4 };
+const cfg = { track: 0, laps: 3, cc: 100, bots: 4, gfx: loadGfx() };
+
+function loadGfx() {
+  try {
+    return localStorage.getItem('gokart.gfx') === 'low' ? 'low' : 'high';
+  } catch {
+    return 'high';
+  }
+}
 const players = new Map(); // pid -> {pid, name, driver, connected, input, points, kb}
 let roomCode = null;
 let phase = 'lobby'; // lobby | countdown | race | results
@@ -29,14 +40,32 @@ const glCanvas = $('gl');
 const hudCanvas = $('hud');
 const hud = hudCanvas.getContext('2d');
 const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.setScissorTest(true);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 const scene = new THREE.Scene();
+// Soft studio reflections for the shiny kart paint.
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = envMap;
+scene.environmentIntensity = 0.7;
 const hemi = new THREE.HemisphereLight(0xffffff, 0x446644, 1);
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(120, 200, 60);
 scene.add(hemi, sun);
-const lobbyCam = new THREE.PerspectiveCamera(50, 1, 1, 3000);
+const sky = new Sky(scene);
+const fx = new FX(scene);
+const lobbyCam = new THREE.PerspectiveCamera(55, 1, 0.5, 1500);
+
+function applyGfx() {
+  const dpr = window.devicePixelRatio || 1;
+  renderer.setPixelRatio(cfg.gfx === 'low' ? Math.min(dpr, 1) * 0.75 : Math.min(dpr, 1.5));
+  fx.density = cfg.gfx === 'low' ? 0.35 : 1;
+  // Low: no reflections and plain kart materials (applies from the next race).
+  scene.environment = cfg.gfx === 'low' ? null : envMap;
+  setLowQuality(cfg.gfx === 'low');
+  if (W) renderer.setSize(W, H, false);
+}
 
 let W = 0, H = 0;
 function resize() {
@@ -50,10 +79,12 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
+applyGfx();
 
 // ---------------------------------------------------------------- track
 let track = null;
 let trackIndex = -1;
+let lobbyS = 0;
 
 function disposeTree(obj) {
   obj.traverse((o) => {
@@ -76,8 +107,13 @@ function loadTrack(i) {
   track = buildTrack(i);
   scene.add(track.group);
   const t = track.theme;
-  scene.background = new THREE.Color(t.sky);
+  sky.setTheme(t.sky, track.center);
+  scene.background = new THREE.Color(t.fog[0]);
   scene.fog = new THREE.Fog(t.fog[0], t.fog[1], t.fog[2]);
+  const sd = t.sky.sunDir ?? [0.5, 0.45, 0.3];
+  sun.position.set(sd[0] * 300, sd[1] * 300, sd[2] * 300);
+  fx.clear();
+  lobbyS = 0;
   hemi.color.setHex(t.hemi[0]);
   hemi.groundColor.setHex(t.hemi[1]);
   hemi.intensity = t.hemi[2];
@@ -126,7 +162,7 @@ function onServer(msg) {
       audio.sfx('join');
       lobbyChanged();
       if (phase !== 'lobby') sendRaceState(p);
-      if (phase === 'results' && lastResults) sendTo(p.pid, lastResults);
+      if (phase === 'results' && lastResults) sendTo(p.pid, { ...lastResults, captain: captainPid() });
       break;
     }
     case 'leave': {
@@ -163,7 +199,7 @@ function onPlayer(p, m) {
       if (Number.isInteger(m.driver) && m.driver >= 0 && m.driver < DRIVERS.length && !driverTaken(m.driver, p)) p.driver = m.driver;
       lobbyChanged();
       if (phase !== 'lobby') sendRaceState(p);
-      if (phase === 'results' && lastResults) sendTo(p.pid, lastResults);
+      if (phase === 'results' && lastResults) sendTo(p.pid, { ...lastResults, captain: captainPid() });
       break;
     case 'pick':
       if (phase === 'lobby' && Number.isInteger(m.driver) && m.driver >= 0 && m.driver < DRIVERS.length && !driverTaken(m.driver, p)) {
@@ -182,7 +218,7 @@ function onPlayer(p, m) {
       break;
     }
     case 'cfg':
-      if (isCaptain && phase === 'lobby') changeCfg(m.k, m.d);
+      if (isCaptain && phase === 'lobby' && ['track', 'laps', 'cc', 'bots'].includes(m.k)) changeCfg(m.k, m.d);
       break;
     case 'start':
       if (isCaptain && phase === 'lobby') startRace();
@@ -206,8 +242,9 @@ function freeDriver() {
 }
 
 // ---------------------------------------------------------------- lobby UI
-let focusRow = 4;
-const ROWS = ['track', 'laps', 'cc', 'bots', 'start'];
+const ROWS = ['track', 'laps', 'cc', 'bots', 'gfx', 'start'];
+const START_ROW = ROWS.indexOf('start');
+let focusRow = START_ROW;
 
 function changeCfg(k, dir) {
   dir = Math.sign(dir) || 1;
@@ -218,6 +255,13 @@ function changeCfg(k, dir) {
     cfg.cc = CC_OPTIONS[Math.max(0, Math.min(CC_OPTIONS.length - 1, i + dir))];
   }
   if (k === 'bots') cfg.bots = Math.max(0, Math.min(MAX_RACERS - 1, cfg.bots + dir));
+  if (k === 'gfx') {
+    cfg.gfx = cfg.gfx === 'high' ? 'low' : 'high';
+    try {
+      localStorage.setItem('gokart.gfx', cfg.gfx);
+    } catch {}
+    applyGfx();
+  }
   audio.sfx('menu');
   loadTrack(cfg.track);
   lobbyChanged();
@@ -251,6 +295,7 @@ function lobbyChanged() {
   $('vLaps').textContent = cfg.laps;
   $('vCc').textContent = `${cfg.cc}cc`;
   $('vBots').textContent = cfg.bots;
+  $('vGfx').textContent = cfg.gfx === 'high' ? 'High' : 'Low (faster)';
   $('startBtn').disabled = ps.length === 0;
   document.querySelectorAll('#settings .row').forEach((r, i) => r.classList.toggle('focus', i === focusRow));
 
@@ -307,6 +352,7 @@ function toast(text) {
 const keys = new Set();
 function enableSound() {
   audio.initAudio();
+  if (phase === 'lobby') audio.startMusic('lobby');
   if (audio.audioReady()) $('soundHint').classList.add('hidden');
   else setTimeout(() => audio.audioReady() && $('soundHint').classList.add('hidden'), 200);
 }
@@ -318,10 +364,10 @@ window.addEventListener('keydown', (e) => {
   if (phase === 'lobby') {
     if (e.code === 'ArrowUp') focusRow = (focusRow + ROWS.length - 1) % ROWS.length;
     else if (e.code === 'ArrowDown') focusRow = (focusRow + 1) % ROWS.length;
-    else if (e.code === 'ArrowLeft' && focusRow < 4) changeCfg(ROWS[focusRow], -1);
-    else if (e.code === 'ArrowRight' && focusRow < 4) changeCfg(ROWS[focusRow], 1);
+    else if (e.code === 'ArrowLeft' && focusRow < START_ROW) changeCfg(ROWS[focusRow], -1);
+    else if (e.code === 'ArrowRight' && focusRow < START_ROW) changeCfg(ROWS[focusRow], 1);
     else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
-      if (focusRow === 4) startRace();
+      if (focusRow === START_ROW) startRace();
       else changeCfg(ROWS[focusRow], 1);
     } else if (e.code === 'KeyK') {
       if (kb?.connected) kb.connected = false;
@@ -393,7 +439,7 @@ function startRace() {
     humanKarts,
     cams,
     track,
-    items: new Items(scene, track, playSfx),
+    items: new Items(scene, track, playSfx, fx),
     order: [...karts],
     laps: cfg.laps,
     cc: CC[cfg.cc],
@@ -407,14 +453,21 @@ function startRace() {
     lastCount: 99,
     statusTimer: 0,
     time: 0,
+    finalLap: false,
+    star: false,
+    homingT: 0,
   };
+  fx.clear();
+  track.setStartLights(0);
   for (const [k, cam] of humanKarts.map((k, i) => [k, cams[i]])) snapCamera(cam, k);
   phase = 'countdown';
   race.phase = phase;
   $('lobby').classList.add('hidden');
   $('results').classList.add('hidden');
   lastResults = null;
-  audio.startMusic(cfg.track);
+  audio.stopMusic();
+  audio.setFinalLap(false);
+  audio.sfx('cheer', 0.6);
   lobbyChanged();
   for (const p of humans) sendRaceState(p);
 }
@@ -433,8 +486,11 @@ function toLobby() {
   race = null;
   phase = 'lobby';
   lastResults = null;
-  audio.stopMusic();
-  audio.setEngine(0, false);
+  audio.stopEngines();
+  audio.setFinalLap(false);
+  audio.startMusic('lobby');
+  fx.clear();
+  track.setStartLights(0);
   $('results').classList.add('hidden');
   $('lobby').classList.remove('hidden');
   lobbyChanged();
@@ -458,7 +514,10 @@ function stepRace(dt) {
     const c = Math.ceil(r.countdown - 1);
     if (c !== r.lastCount && c >= 0) {
       r.lastCount = c;
-      if (c > 0) audio.sfx('count');
+      if (c > 0 && c <= 3) {
+        audio.sfx('count');
+        r.track.setStartLights(4 - c);
+      }
     }
     // Rocket start: press the gas late in "1" (holding it from earlier doesn't count).
     for (const k of r.humanKarts) {
@@ -469,6 +528,8 @@ function stepRace(dt) {
     if (r.countdown <= 1) {
       r.phase = phase = 'race';
       audio.sfx('go');
+      audio.startMusic(trackIndex);
+      r.track.setStartLights(4);
       for (const k of r.humanKarts) {
         if (k.rocket === 1 && k.player.input.gas) {
           k.giveBoost(1.1);
@@ -477,6 +538,7 @@ function stepRace(dt) {
       }
     }
     for (const k of r.karts) k.updateModel(dt, r.time);
+    updateEngines(r);
     return;
   }
 
@@ -510,6 +572,7 @@ function stepRace(dt) {
       if (k.padCd <= 0 && Math.abs(di) <= 2 && Math.abs(k.lateral - pad.lat) < 2.3) {
         k.giveBoost(0.9);
         k.padCd = 1;
+        if (k.human) audio.sfx('pad');
       }
     }
 
@@ -526,6 +589,10 @@ function stepRace(dt) {
         if (k.lap === r.laps) {
           flash(k, 'FINAL LAP!', '#ff5a5a');
           audio.sfx('final');
+          if (!r.finalLap) {
+            r.finalLap = true;
+            audio.setFinalLap(true);
+          }
         } else {
           flash(k, `LAP ${k.lap}`, '#fff');
           audio.sfx('lap');
@@ -549,13 +616,57 @@ function stepRace(dt) {
     for (const ev of k.events) {
       if (k.human) {
         if (['box', 'gotitem', 'boost', 'bonk', 'bump'].includes(ev)) audio.sfx(ev);
-        if (ev === 'finish') audio.sfx('finish');
+        if (ev === 'finish') {
+          audio.sfx('finish');
+          fx.confetti(k.x, 0, k.z, 90);
+          r.cheer = 3;
+        }
+        if (ev === 'hit' || ev === 'bonk' || ev === 'zap') k.shake = ev === 'bonk' ? 0.25 : 0.6;
         if (k.player) sendTo(k.player.pid, { t: 'fx', k: ev });
       }
-      if (ev === 'hit' && !k.human) audio.sfx('bump');
+      if (ev === 'hit') {
+        fx.burst(k.x, 1.5, k.z, [0xffe14d, 0xffffff], 14, 6, 1);
+        if (!k.human) audio.sfx('bump');
+      }
+      if (ev === 'box') fx.burst(k.x, 1.4, k.z, [0xff5ec4, 0xffd84d, 0x4dd2ff, 0x7dff6e], 22, 10, 2);
+      if (ev === 'boost') for (let i = 0; i < 8; i++) fx.flame(k.x - k.forwardX * 2, 0.8, k.z - k.forwardZ * 2, -k.forwardX * 6, -k.forwardZ * 6, true);
     }
     k.events.length = 0;
+    // Mini-turbo tier-up chirp.
+    const tier = k.drifting ? k.driftTier() : -1;
+    if (k.human && tier > (k.lastTier ?? -1)) audio.sfx('tier', tier);
+    k.lastTier = tier;
     k.updateModel(dt, r.time);
+    emitKartFx(k, dt);
+  }
+  r.cheer = Math.max(0, (r.cheer || 0) - dt);
+
+  // Roulette ticks and red-shell warning beeps for human players.
+  for (const k of r.humanKarts) {
+    if (k.roulette > 0) {
+      k.tickT = (k.tickT || 0) - dt;
+      if (k.tickT <= 0) {
+        k.tickT = 0.07;
+        audio.sfx('tick');
+      }
+    }
+  }
+  r.homingT -= dt;
+  if (r.homingT <= 0) {
+    let closest = Infinity;
+    for (const o of r.items.objects) {
+      if (o.type !== 'red' || !o.target?.human) continue;
+      closest = Math.min(closest, Math.hypot(o.x - o.target.x, o.z - o.target.z));
+    }
+    if (closest < 60) {
+      audio.sfx('beep', 1 - closest / 60);
+      r.homingT = 0.08 + (closest / 60) * 0.35;
+    } else r.homingT = 0.1;
+  }
+  const anyStar = r.humanKarts.some((k) => k.star > 0);
+  if (anyStar !== r.star) {
+    r.star = anyStar;
+    if (r.phase === 'race') audio.setStar(anyStar);
   }
 
   // End of race.
@@ -570,17 +681,67 @@ function stepRace(dt) {
     }
   }
 
-  // Engine sound follows the human karts.
-  const lvl = r.humanKarts.length
-    ? r.humanKarts.reduce((s, k) => s + Math.min(1, Math.abs(k.speed) / r.cc.maxSpeed), 0) / r.humanKarts.length
-    : 0;
-  audio.setEngine(lvl, r.phase === 'race');
+  updateEngines(r);
 
   r.statusTimer -= dt;
   if (r.statusTimer <= 0) {
     r.statusTimer = 0.15;
     for (const k of r.humanKarts) if (k.player?.connected) sendRaceState(k.player);
   }
+}
+
+// Particles coming off a kart: drift sparks + tyre smoke, dust off-road, boost flames, star glitter.
+function emitKartFx(k, dt) {
+  // Only bother for karts someone can see.
+  const near = race.humanKarts.length === 0 || race.humanKarts.some((h) => (h.x - k.x) ** 2 + (h.z - k.z) ** 2 < 130 * 130);
+  if (!near) return;
+  const per = (rate) => Math.random() < rate * dt * fx.density;
+  const fwdX = k.forwardX, fwdZ = k.forwardZ;
+  const sc = k.shrink > 0 ? 0.6 : 1;
+  const speed = Math.abs(k.speed);
+  if (k.drifting && speed > 6) {
+    const tier = k.driftTier();
+    const color = tier >= 0 ? DRIFT_TIERS[tier].color : 0xfff2b0;
+    for (const sx of [-1.05, 1.05]) {
+      const p = k.toWorld(sx * sc, 0.2, -0.95 * sc);
+      if (per(tier >= 0 ? 70 : 25)) fx.spark(p.x, p.y, p.z, color, -fwdX * 3, -fwdZ * 3);
+      if (per(14)) fx.smoke(p.x, 0.3, p.z, k.vx, k.vz);
+    }
+  }
+  if (k.offroad && speed > 4) {
+    for (const sx of [-1, 1]) {
+      const p = k.toWorld(sx * sc, 0.2, -0.9 * sc);
+      if (per(18)) fx.dust(p.x, p.y, p.z, race.track.theme.dust, k.vx, k.vz);
+    }
+  }
+  if (k.boost > 0) {
+    for (const e of k.model.exhausts) {
+      const p = k.toWorld(e.x * sc, e.y * sc, e.z * sc);
+      if (per(60)) fx.flame(p.x, p.y, p.z, -fwdX * 8 + k.vx * 0.5, -fwdZ * 8 + k.vz * 0.5, true);
+    }
+  }
+  if (k.star > 0 && per(40)) fx.sparkle(k.x, 1.2, k.z, new THREE.Color().setHSL(Math.random(), 1, 0.6).getHex());
+  if (k.spin > 0 && per(20)) fx.smoke(k.x, 0.6, k.z, 0, 0, 0xffffff, 0.3);
+}
+
+// One engine voice per human player, panned toward their part of the screen.
+function updateEngines(r) {
+  const rects = layout(r.humanKarts.length, W, H);
+  const scale = 1 / Math.sqrt(Math.max(1, r.humanKarts.length));
+  r.humanKarts.forEach((k, i) => {
+    const rc = rects[i];
+    audio.updateEngine(k.id, {
+      speed: k.speed,
+      max: r.cc.maxSpeed,
+      gas: !!k.input.gas || k.boost > 0,
+      boost: k.boost > 0,
+      drifting: k.drifting,
+      offroad: k.offroad,
+      pan: rc ? ((rc.x + rc.w / 2) / W - 0.5) * 1.2 : 0,
+      on: r.phase !== 'results',
+      scale,
+    });
+  });
 }
 
 function sendRaceState(p) {
@@ -607,7 +768,10 @@ function sendRaceState(p) {
 function showResults() {
   const r = race;
   r.phase = phase = 'results';
-  audio.setEngine(0, false);
+  audio.stopEngines();
+  audio.setStar(false);
+  audio.startMusic('results');
+  r.cheer = 4;
   // Unfinished racers keep their current order.
   const rows = r.order.map((k, i) => {
     const pts = POINTS[i] || 0;
@@ -638,22 +802,45 @@ function showResults() {
   $('results').classList.remove('hidden');
   lastResults = { t: 'results', rows, captain: captainPid() };
   sendTo('*', lastResults);
-  audio.sfx('finish');
+  audio.sfx('cheer', 1.2);
+  fx.confetti(r.order[0].x, 0, r.order[0].z, 120);
 }
 
 // ---------------------------------------------------------------- cameras + render
 const tmpV = new THREE.Vector3();
+const tmpL = new THREE.Vector3();
 function snapCamera(cam, k) {
   cam.position.set(k.x - k.forwardX * 7.5, 3.4, k.z - k.forwardZ * 7.5);
   cam.lookAt(k.x + k.forwardX * 4, 1.2, k.z + k.forwardZ * 4);
 }
 
-function updateCamera(cam, k, dt) {
-  const back = 7.5, up = 3.4;
-  tmpV.set(k.x - k.forwardX * back, up, k.z - k.forwardZ * back);
-  cam.position.lerp(tmpV, 1 - Math.exp(-dt * 7));
-  cam.lookAt(k.x + k.forwardX * 4, 1.2, k.z + k.forwardZ * 4);
-  const fov = 62 + (k.boost > 0 ? 10 : 0);
+const ease = (t) => t * t * (3 - 2 * t);
+
+function updateCamera(cam, k, dt, r) {
+  let back = 6.6, up = 3.1, angle = Math.PI, follow = 11;
+  // Intro swoop during the countdown: start in front of the kart and circle behind it.
+  if (r && r.phase === 'countdown') {
+    const t = ease(Math.min(1, Math.max(0, (COUNTDOWN - r.countdown) / 2.4)));
+    angle = 0.5 + (Math.PI - 0.5) * t;
+    back = 14 - 6.8 * t;
+    up = 7 - 3.7 * t;
+    follow = 60;
+  }
+  const h = k.heading + Math.PI - angle;
+  tmpV.set(k.x - Math.sin(h) * back, up, k.z - Math.cos(h) * back);
+  cam.position.lerp(tmpV, 1 - Math.exp(-dt * follow));
+  // Shake after hits and wall bonks.
+  if (k.shake > 0) {
+    k.shake = Math.max(0, k.shake - dt);
+    const a = k.shake * 0.5;
+    cam.position.x += (Math.random() - 0.5) * a;
+    cam.position.y += (Math.random() - 0.5) * a;
+  }
+  tmpL.set(k.x + k.forwardX * 4, 1.2, k.z + k.forwardZ * 4);
+  cam.lookAt(tmpL);
+  // Lean into drifts a little.
+  cam.rotateZ(k.drifting ? k.driftDir * 0.04 : 0);
+  const fov = 64 + (k.boost > 0 ? 12 : 0) + Math.min(6, Math.max(0, k.speed - 20) * 0.6);
   cam.fov += (fov - cam.fov) * Math.min(1, dt * 4);
   cam.updateProjectionMatrix();
 }
@@ -664,43 +851,56 @@ function renderView(cam, r) {
   renderer.setScissor(r.x, H - r.y - r.h, r.w, r.h);
   cam.aspect = r.w / r.h;
   cam.updateProjectionMatrix();
+  sky.follow(cam);
+  fx.setViewport(cam, r.h);
   renderer.render(scene, cam);
 }
 
-let lobbyAngle = 0;
+// Lobby: a slow fly-through along the track.
 function renderLobby(dt) {
   if (!track) return;
-  lobbyAngle += dt * 0.06;
   const cl = track.cl;
-  let cx = 0, cz = 0;
-  for (let i = 0; i < cl.n; i++) ((cx += cl.px[i]), (cz += cl.pz[i]));
-  cx /= cl.n; cz /= cl.n;
-  lobbyCam.position.set(cx + Math.cos(lobbyAngle) * 300, 150, cz + Math.sin(lobbyAngle) * 300);
-  lobbyCam.lookAt(cx, 0, cz);
+  lobbyS = (lobbyS + (dt * 9) / cl.seg) % cl.n;
+  const p = cl.pointAt(lobbyS, Math.sin(lobbyS / 60) * 6);
+  const a = cl.pointAt(lobbyS + 22 / cl.seg, 0);
+  lobbyCam.position.set(p.x, 9 + Math.sin(lobbyS / 40) * 3, p.z);
+  lobbyCam.lookAt(a.x, 2, a.z);
+  fx.ambient(dt, p.x, p.z, track.theme.weather);
   renderView(lobbyCam, { x: 0, y: 0, w: W, h: H });
 }
 
-const overviewCam = new THREE.PerspectiveCamera(62, 1, 0.5, 1500);
+const overviewCam = new THREE.PerspectiveCamera(60, 1, 0.5, 1500);
+let orbit = 0;
 function render(dt) {
   hud.clearRect(0, 0, W, H);
+  sky.update(dt);
+  fx.update(dt);
+  const time = performance.now() / 1000;
   if (!race) {
+    track?.update(time, 0);
     renderLobby(dt);
     return;
   }
   const r = race;
+  track.update(time, r.phase === 'countdown' ? 0.4 : r.cheer > 0 ? 1 : 0.1);
   const views = r.humanKarts;
   if (r.phase === 'results' || views.length === 0) {
+    // Orbit the winner.
     const lead = r.order[0];
-    updateCamera(overviewCam, lead, dt);
+    orbit += dt * 0.35;
+    overviewCam.position.set(lead.x + Math.cos(orbit) * 11, 4.5, lead.z + Math.sin(orbit) * 11);
+    overviewCam.lookAt(lead.x, 1, lead.z);
+    fx.ambient(dt, lead.x, lead.z, track.theme.weather);
     renderView(overviewCam, { x: 0, y: 0, w: W, h: H });
     return;
   }
   const rects = layout(views.length, W, H);
   views.forEach((k, i) => {
-    updateCamera(r.cams[i], k, dt);
-    k.model.tag.visible = false;
+    updateCamera(r.cams[i], k, dt, r);
+    if (i < 4) fx.ambient(dt / Math.min(views.length, 4), k.x, k.z, track.theme.weather);
+    // Name tags only for nearby rivals, so distant packs don't turn into a pile of labels.
+    for (const o of r.karts) o.model.tag.visible = o !== k && (o.x - k.x) ** 2 + (o.z - k.z) ** 2 < 70 * 70;
     renderView(r.cams[i], rects[i]);
-    k.model.tag.visible = true;
   });
   views.forEach((k, i) => drawViewportHud(hud, rects[i], k, r, r.time));
 
@@ -722,8 +922,8 @@ function render(dt) {
     hud.fill();
     drawMinimap(hud, { x: mx, y: my, w: m, h: m }, r.track, r.karts);
   }
-  if (r.phase === 'countdown') drawCountdown(hud, W, H, Math.ceil(r.countdown - 1));
-  else if (r.clock < 1) drawCountdown(hud, W, H, 0);
+  if (r.phase === 'countdown') drawCountdown(hud, W, H, Math.ceil(r.countdown - 1), r.countdown);
+  else if (r.clock < 1) drawCountdown(hud, W, H, 0, r.clock);
 }
 
 // ---------------------------------------------------------------- main loop
@@ -757,6 +957,9 @@ window.gokart = {
   get phase() { return phase; },
   players,
   cfg,
+  renderer,
+  scene,
+  get track() { return track; },
   startRace,
   toLobby,
   // Fast-forward the simulation (used by the end-to-end smoke test).

@@ -44,6 +44,31 @@ export function drawViewportHud(g, r, k, race, time) {
   g.rect(r.x, r.y, r.w, r.h);
   g.clip();
 
+  // Speed lines while boosting.
+  if (k.boost > 0 || k.star > 0) {
+    const cx = r.x + r.w / 2, cy = r.y + r.h * 0.55;
+    const rad = Math.hypot(r.w, r.h) / 2;
+    g.strokeStyle = k.star > 0 ? `hsla(${(time * 400) % 360},100%,75%,0.35)` : 'rgba(255,255,255,0.32)';
+    g.lineCap = 'round';
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r0 = rad * (0.55 + Math.random() * 0.25), r1 = r0 + rad * (0.2 + Math.random() * 0.3);
+      g.lineWidth = 1 + Math.random() * 3;
+      g.beginPath();
+      g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0 * 0.7);
+      g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1 * 0.7);
+      g.stroke();
+    }
+  }
+  // Red vignette while spinning out.
+  if (k.spin > 0) {
+    const grd = g.createRadialGradient(r.x + r.w / 2, r.y + r.h / 2, Math.min(r.w, r.h) * 0.3, r.x + r.w / 2, r.y + r.h / 2, Math.max(r.w, r.h) * 0.7);
+    grd.addColorStop(0, 'rgba(255,0,0,0)');
+    grd.addColorStop(1, `rgba(255,30,30,${Math.min(0.45, k.spin * 0.5)})`);
+    g.fillStyle = grd;
+    g.fillRect(r.x, r.y, r.w, r.h);
+  }
+
   // Lap + timer, top-left.
   const lap = Math.min(race.laps, Math.max(1, k.lap));
   outlined(g, `LAP ${lap}/${race.laps}`, r.x + pad, r.y + pad + 40 * s, 40 * s + 8, '#fff');
@@ -54,12 +79,20 @@ export function drawViewportHud(g, r, k, race, time) {
   // Item box, top-center.
   const bs = 90 * s + 30;
   const bx = r.x + r.w / 2 - bs / 2, by = r.y + pad;
-  g.fillStyle = 'rgba(0,0,0,0.45)';
-  g.strokeStyle = 'rgba(255,255,255,0.9)';
-  g.lineWidth = 3;
+  const boxGrad = g.createLinearGradient(bx, by, bx, by + bs);
+  boxGrad.addColorStop(0, 'rgba(40,40,80,0.75)');
+  boxGrad.addColorStop(1, 'rgba(10,10,30,0.75)');
+  g.fillStyle = boxGrad;
+  g.lineWidth = 4;
+  g.strokeStyle = k.roulette > 0 ? `hsl(${(time * 600) % 360},100%,65%)` : 'rgba(255,255,255,0.95)';
   g.beginPath();
-  g.roundRect(bx, by, bs, bs, bs * 0.2);
+  g.roundRect(bx, by, bs, bs, bs * 0.22);
   g.fill();
+  g.stroke();
+  g.lineWidth = 2;
+  g.strokeStyle = 'rgba(0,0,0,0.6)';
+  g.beginPath();
+  g.roundRect(bx + 5, by + 5, bs - 10, bs - 10, bs * 0.18);
   g.stroke();
   let icon = null;
   if (k.roulette > 0) icon = ITEMS[ITEM_TYPES[Math.floor(time * 14) % ITEM_TYPES.length]].icon;
@@ -78,14 +111,30 @@ export function drawViewportHud(g, r, k, race, time) {
     const place = k.place;
     const txt = ordinal(place);
     const size = 110 * s + 24;
-    outlined(g, txt, r.x + r.w - pad, r.y + r.h - pad, size, PLACE_COLORS[place - 1] || '#fff', 'right');
+    // Pop when the position changes.
+    if (k.hudPlace !== place) {
+      k.hudPlace = place;
+      k.hudPop = time;
+    }
+    const pop = 1 + Math.max(0, 0.35 - (time - (k.hudPop || 0))) * 1.2;
+    const x = r.x + r.w - pad, y = r.y + r.h - pad;
+    g.save();
+    g.translate(x, y);
+    g.scale(pop, pop);
+    const base = PLACE_COLORS[place - 1] || '#ffffff';
+    const grad = g.createLinearGradient(0, -size, 0, 0);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.5, base);
+    grad.addColorStop(1, base);
+    outlined(g, txt, 0, 0, size, grad, 'right');
+    g.restore();
   }
 
   // Drift charge / boost meter, bottom-left.
   if (k.drifting) {
     const tier = k.driftTier();
     const label = ['', 'MINI-TURBO', 'SUPER', 'ULTRA'][tier + 1];
-    if (label) outlined(g, label, r.x + pad, r.y + r.h - pad, 30 * s + 8, ['#3fa9ff', '#ff9a1f', '#ff3fd2'][tier]);
+    if (label) outlined(g, label, r.x + r.w / 2, r.y + r.h - pad, 34 * s + 10, ['#3fa9ff', '#ff9a1f', '#ff3fd2'][tier], 'center');
   }
 
   if (k.wrongWay > 1.2 && !k.finished) {
@@ -162,8 +211,17 @@ export function drawStandings(g, r, order) {
   g.restore();
 }
 
-export function drawCountdown(g, W, H, value) {
+export function drawCountdown(g, W, H, value, t = 0) {
+  if (value > 3) return;
   const txt = value > 0 ? String(value) : 'GO!';
   const color = ['#3dff6e', '#ffe14d', '#ffa64d', '#ff4d4d'][Math.max(0, Math.min(3, value))];
-  outlined(g, txt, W / 2, H / 2 + Math.min(W, H) * 0.08, Math.min(W, H) * 0.25, color, 'center');
+  // Each number punches in big and settles; GO! grows and fades.
+  const f = value > 0 ? t % 1 : t;
+  const scale = value > 0 ? 1 + Math.max(0, f - 0.75) * 2.4 : 1 + f * 0.6;
+  g.save();
+  g.globalAlpha = value > 0 ? 1 : Math.max(0, 1 - f);
+  g.translate(W / 2, H / 2);
+  g.scale(scale, scale);
+  outlined(g, txt, 0, Math.min(W, H) * 0.08, Math.min(W, H) * 0.25, color, 'center');
+  g.restore();
 }

@@ -39,6 +39,38 @@ Phone: open http://192.168.1.42:8080/play  (or scan the QR code on the TV)
 
 Use a different port with `PORT=3000 npm start`.
 
+## Run with Docker
+
+On your server, set `PUBLIC_URL` to the address phones will use to reach it. Inside a
+container the server only sees Docker's internal IP, so without this the QR code on the
+TV would point phones at an address they can't reach.
+
+```bash
+docker build -t gokart .
+docker run -d --name gokart --restart unless-stopped \
+  -p 8080:8080 -e PUBLIC_URL=http://192.168.1.42:8080 gokart
+```
+
+Or use Compose. It publishes the game on host port **8742** (8080 is usually taken on a
+home server) and defaults `PUBLIC_URL` to `http://192.168.1.50:8742` (the Proxmox box).
+To change either, put `GOKART_PORT=...` and/or `PUBLIC_URL=...` in a `.env` file next to
+`docker-compose.yml`:
+
+```bash
+# first time
+ssh root@192.168.1.50 'git clone https://github.com/gmaingret/gokart /root/gokart && cd /root/gokart && docker compose up -d --build'
+# updates
+ssh root@192.168.1.50 'cd /root/gokart && git pull && docker compose up -d --build'
+```
+
+The repo is private, so the clone needs the same GitHub credentials the box already uses
+for `/root/chris`.
+
+Then open `http://<server-ip>:<port>/` on the TV (`http://192.168.1.50:8742/` with Compose). If you put it behind a reverse proxy
+(e.g. `https://gokart.example.com`), set `PUBLIC_URL` to that address and make sure the
+proxy forwards WebSocket upgrades on `/ws`. Serving it over `https://` also makes tilt
+steering work on iPhones.
+
 ## Phone controls
 
 Hold the phone sideways.

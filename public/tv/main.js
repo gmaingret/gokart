@@ -268,14 +268,16 @@ function lobbyChanged() {
 async function updateJoinInfo() {
   let host = location.hostname;
   let port = location.port || (location.protocol === 'https:' ? '443' : '80');
-  if (['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)) {
-    try {
-      const info = await (await fetch('/api/info')).json();
+  let base = null;
+  try {
+    const info = await (await fetch('/api/info')).json();
+    if (info.publicUrl) base = info.publicUrl;
+    else if (['localhost', '127.0.0.1', '::1', '[::1]'].includes(host)) {
       if (info.addresses?.[0]) host = info.addresses[0].address;
       port = String(info.port);
-    } catch {}
-  }
-  const base = `${location.protocol}//${host}${port === '80' || port === '443' ? '' : ':' + port}`;
+    }
+  } catch {}
+  base ??= `${location.protocol}//${host}${port === '80' || port === '443' ? '' : ':' + port}`;
   const url = `${base}/play?room=${roomCode}`;
   $('qr').src = `/api/qr?u=${encodeURIComponent(url)}`;
   $('joinUrl').textContent = `${base.replace(/^https?:\/\//, '')}/play`;

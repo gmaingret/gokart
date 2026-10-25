@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d24">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/controller/manifest.webmanifest">
+  <link rel="icon" href="/shared/icon.svg" type="image/svg+xml">
+  <title>GoKart Controller</title>
+  <link rel="stylesheet" href="/controller/controller.css">
+</head>
+<body>
+  <div id="banner" class="hidden"></div>
+
+  <!-- Join -->
+  <section id="sJoin" class="screen center">
+    <h1 class="logo">Go<span>Kart</span></h1>
+    <label class="field">Your name
+      <input id="name" maxlength="12" autocomplete="nickname" placeholder="Player" enterkeyhint="go">
+    </label>
+    <label class="field" id="codeField">Room code <small>(shown on the TV)</small>
+      <input id="code" maxlength="4" autocapitalize="characters" placeholder="ABCD">
+    </label>
+    <div class="drivers" id="joinDrivers"></div>
+    <button id="joinBtn" class="big">Join race</button>
+    <p class="err" id="joinErr"></p>
+  </section>
+
+  <!-- Lobby -->
+  <section id="sLobby" class="screen hidden">
+    <div class="lobby-wrap">
+      <div class="col">
+        <h2>Pick your driver</h2>
+        <div class="drivers" id="lobbyDrivers"></div>
+        <div class="others" id="others"></div>
+      </div>
+      <div class="col">
+        <div id="captainBox" class="hidden">
+          <h2>You're the captain</h2>
+          <div class="cfg" data-k="track"><span>Track</span><button data-d="-1">◀</button><b id="cTrack"></b><button data-d="1">▶</button></div>
+          <div class="cfg" data-k="laps"><span>Laps</span><button data-d="-1">◀</button><b id="cLaps"></b><button data-d="1">▶</button></div>
+          <div class="cfg" data-k="cc"><span>Speed</span><button data-d="-1">◀</button><b id="cCc"></b><button data-d="1">▶</button></div>
+          <div class="cfg" data-k="bots"><span>CPU</span><button data-d="-1">◀</button><b id="cBots"></b><button data-d="1">▶</button></div>
+          <button id="startBtn" class="big">START!</button>
+        </div>
+        <div id="waitBox">
+          <h2>You're in!</h2>
+          <p>Waiting for the captain to start the race…</p>
+          <p class="small" id="waitCfg"></p>
+        </div>
+        <button id="settingsBtn" class="ghost">⚙️ Controls</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Race controls -->
+  <section id="sRace" class="screen hidden">
+    <div class="topbar">
+      <span id="rPlace" class="place">–</span>
+      <span id="rLap">Lap 1/3</span>
+      <button id="rMenu" class="ghost small">⚙️</button>
+    </div>
+    <div class="pad">
+      <div id="steer" class="steer">
+        <div class="track-line"></div>
+        <div id="knob" class="knob"></div>
+        <div class="steer-buttons">
+          <button id="left" class="sbtn">◀</button>
+          <button id="right" class="sbtn">▶</button>
+        </div>
+        <div id="tiltInfo" class="tilt-info hidden">Tilt to steer</div>
+      </div>
+      <div id="buttons" class="buttons">
+        <button id="item" class="btn item"><span id="itemIcon"></span><small>ITEM</small></button>
+        <button id="drift" class="btn drift">DRIFT<small>hold + steer</small></button>
+        <button id="brake" class="btn brake">BRAKE<small>/ back</small></button>
+        <button id="gas" class="btn gas">GAS</button>
+      </div>
+    </div>
+    <div id="countdown" class="countdown hidden"></div>
+    <div id="finishMsg" class="finish hidden"></div>
+  </section>
+
+  <!-- Results -->
+  <section id="sResults" class="screen hidden">
+    <h2>Results</h2>
+    <ol id="resList"></ol>
+    <button id="nextBtn" class="big hidden">Continue</button>
+    <p id="resWait" class="small">Waiting for the captain…</p>
+  </section>
+
+  <!-- Watching -->
+  <section id="sWatch" class="screen center hidden">
+    <h2>Race in progress 🏁</h2>
+    <p>Watch the TV — you'll join the next race.</p>
+  </section>
+
+  <!-- Settings -->
+  <div id="settings" class="modal hidden">
+    <div class="sheet">
+      <h2>Controls</h2>
+      <label class="opt"><span>Steering</span>
+        <select id="optSteer">
+          <option value="drag">Slide thumb</option>
+          <option value="buttons">◀ ▶ buttons</option>
+          <option value="tilt">Tilt phone</option>
+        </select>
+      </label>
+      <label class="opt"><span>Auto-accelerate</span><input type="checkbox" id="optAuto"></label>
+      <label class="opt"><span>Invert tilt</span><input type="checkbox" id="optInvert"></label>
+      <label class="opt"><span>Vibration</span><input type="checkbox" id="optVibe"></label>
+      <p class="small">Tip: tap <b>ITEM</b> to use it. Hold <b>BRAKE</b> while tapping ITEM to throw shells backwards (or bananas forward).</p>
+      <button id="quitBtn" class="ghost hidden">End race (captain)</button>
+      <button id="closeSettings" class="big">Done</button>
+    </div>
+  </div>
+
+  <script type="module" src="/controller/controller.js"></script>
+</body>
+</html>

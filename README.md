@@ -1,0 +1,106 @@
+# GoKart 🏎️
+
+A Mario Kart–style party racer for the living room. The **TV browser is the screen**
+and **phones on the same Wi-Fi are the controllers** — no app to install, no gamepads.
+
+- Up to **8 racers**: friends on phones plus CPU drivers to fill the grid
+- **Split screen** for every human player (1 → full screen, 2 → top/bottom, 3–4 → 2×2, up to 4×2),
+  with a live minimap and standings
+- **4 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night
+- **Drifting with mini-turbos** (blue → orange → pink sparks), boost pads, rocket starts
+- **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
+  mushroom, triple mushroom, star and lightning
+- 50cc / 100cc / 150cc, 1–7 laps, cup points that carry across races
+- Phones vibrate when you get hit, grab an item or boost (Android)
+- Drop-in reconnects: a phone or the TV can reload mid-race and pick up where it was
+
+## Quick start
+
+You need [Node.js](https://nodejs.org) 18+ on any computer on your home network
+(laptop, desktop, Raspberry Pi…).
+
+```bash
+npm install
+npm start
+```
+
+The server prints something like:
+
+```
+TV  : open  http://192.168.1.42:8080/   in the TV browser
+Phone: open http://192.168.1.42:8080/play  (or scan the QR code on the TV)
+```
+
+1. Open the first address in your **TV's web browser** (or cast/HDMI a laptop to the TV).
+2. Everyone **scans the QR code** on the TV with their phone (or types the address).
+3. Enter a name, pick a driver, tap **Join race**.
+4. The first phone to join is the **captain 👑** and picks track, laps, speed and CPU count,
+   then hits **START!**
+
+Use a different port with `PORT=3000 npm start`.
+
+## Phone controls
+
+Hold the phone sideways.
+
+| Control | What it does |
+| --- | --- |
+| Left pad | Slide your thumb left/right to steer (or switch to ◀ ▶ buttons or tilt in ⚙️) |
+| **DRIFT** | Hold while steering into a corner. Keep it held to charge sparks; release for a boost |
+| **ITEM** | Use your item. Hold **BRAKE** while tapping ITEM to throw shells backwards / bananas forwards |
+| **BRAKE** | Brake, then reverse |
+| **GAS** | Only shown if you turn off *Auto-accelerate* in ⚙️ |
+
+Rocket start: with auto-accelerate off, press GAS during the last half of the "1" in the countdown.
+
+Tilt steering needs motion-sensor access. iPhones only allow that on `https://` pages,
+so on a plain-http home network use slide steering there.
+
+## TV / keyboard controls
+
+- TV remote in the lobby: ▲▼ choose a setting, ◀▶ change it, OK starts the race; OK on the results screen continues.
+- **K** adds a keyboard racer (arrows/WASD, Space to drift, X to use an item) — handy for testing without phones.
+- **Esc** ends the current race.
+
+## How it works
+
+```
+ phone ──┐                      ┌── TV browser (three.js)
+ phone ──┼── WebSocket relay ───┤   runs the whole simulation:
+ phone ──┘   (server.js)        │   physics, AI, items, rendering
+```
+
+- `server.js` serves the pages and relays messages; it holds no game state. Each TV gets a
+  4-letter room code; phones are routed to it and keep their slot through reconnects.
+- The TV runs a fixed 60 Hz simulation and renders one viewport per human player.
+- Phones send their stick/button state ~8× per second and on every change; the TV sends
+  back place, lap and item so the phone shows them.
+
+```
+server.js              HTTP + WebSocket server, QR code endpoint
+src/relay.js           room / player message relay
+public/tv/             TV game (main loop, track builder, kart physics, items, AI, HUD, audio)
+public/controller/     phone controller
+public/shared/         data shared by both (drivers, items, points)
+test/                  node:test unit tests
+```
+
+## Development
+
+```bash
+npm test          # relay + track geometry tests
+```
+
+All tracks are generated from a handful of control points in `public/tv/track.js`. Add a
+new entry to `TRACKS` (and its name to `TRACK_NAMES` in `public/shared/config.js`); the tests
+check that the new layout never overlaps itself.
+
+## Troubleshooting
+
+- **Phones can't load the page**: make sure they're on the same Wi-Fi as the computer
+  running the server (not a guest network), and that the computer's firewall allows
+  incoming connections on the port.
+- **QR code shows the wrong address**: open the TV page with the computer's LAN address
+  instead of `localhost`; the QR code then uses that address.
+- **Several TVs on one server**: phones pick the room automatically if there is only one;
+  otherwise they enter the 4-letter room code shown on the TV.

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoKart</title>
+  <link rel="icon" href="/shared/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/tv/tv.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <canvas id="hud"></canvas>
+
+  <section id="lobby" class="screen">
+    <header class="brand">
+      <h1>Go<span>Kart</span></h1>
+      <p>Grab your phone, join the Wi-Fi, scan the code and race!</p>
+    </header>
+    <div class="lobby-grid">
+      <div class="panel join">
+        <img id="qr" alt="QR code to join">
+        <div class="join-url" id="joinUrl">…</div>
+        <div class="join-code">Room code <b id="roomCode">····</b></div>
+      </div>
+      <div class="panel players">
+        <h2>Racers <small id="playerCount">0/8</small></h2>
+        <ul id="playerList"></ul>
+        <p class="hint" id="captainHint">The first player to join is the captain and can start the race from their phone.</p>
+      </div>
+      <div class="panel settings" id="settings">
+        <h2>Race setup</h2>
+        <div class="row" data-k="track"><span>Track</span><button class="dec">◀</button><b id="vTrack"></b><button class="inc">▶</button></div>
+        <div class="row" data-k="laps"><span>Laps</span><button class="dec">◀</button><b id="vLaps"></b><button class="inc">▶</button></div>
+        <div class="row" data-k="cc"><span>Speed</span><button class="dec">◀</button><b id="vCc"></b><button class="inc">▶</button></div>
+        <div class="row" data-k="bots"><span>CPU racers</span><button class="dec">◀</button><b id="vBots"></b><button class="inc">▶</button></div>
+        <div class="row start" data-k="start"><button id="startBtn">Start race</button></div>
+        <p class="hint">TV remote: ▲▼ choose · ◀▶ change · OK start<br>Keyboard: press <kbd>K</kbd> to add a keyboard racer (arrows, Space drift, X item)</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="results" class="screen hidden">
+    <h1 id="resultsTitle">Results</h1>
+    <table>
+      <thead><tr><th>#</th><th>Racer</th><th>Time</th><th>Points</th><th>Total</th></tr></thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+    <p class="hint">Captain: tap <b>Continue</b> on your phone (or press OK on the TV)</p>
+  </section>
+
+  <div id="toast"></div>
+  <div id="soundHint">🔈 Click or press OK to turn on sound</div>
+  <div id="conn" class="hidden">Reconnecting to the GoKart server…</div>
+
+  <script type="module" src="/tv/main.js"></script>
+</body>
+</html>

@@ -5,8 +5,9 @@ services:
     container_name: gokart
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      # Host port; change GOKART_PORT in a .env file if 8742 is taken.
+      - "${GOKART_PORT:-8742}:8080"
     environment:
       # The address phones use to reach this server (put it in the QR code).
       # Defaults to the Proxmox box; override with PUBLIC_URL=... in a .env file.
-      PUBLIC_URL: "${PUBLIC_URL:-http://192.168.1.50:8080}"
+      PUBLIC_URL: "${PUBLIC_URL:-http://192.168.1.50:${GOKART_PORT:-8742}}"

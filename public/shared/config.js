@@ -11,7 +11,10 @@ export const DRIVERS = [
   { id: 'frost', name: 'Frost', color: '#d9e4ee', accent: '#2b6cb0' },
 ];
 
-export const TRACK_NAMES = ['Sunny Circuit', 'Dune Dash', 'Frosty Peaks', 'Neon Night'];
+export const TRACK_NAMES = [
+  'Sunny Circuit', 'Dune Dash', 'Frosty Peaks', 'Neon Night', 'Autumn Woods',
+  'Beach Bay', 'Lava Castle', 'Candy Land', 'Jungle Ruins', 'Cosmic Way',
+];
 
 export const ITEMS = {
   banana: { label: 'Banana', icon: '🍌' },

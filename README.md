@@ -6,11 +6,16 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - Up to **8 racers**: friends on phones plus CPU drivers to fill the grid
 - **Split screen** for every human player (1 → full screen, 2 → top/bottom, 3–4 → 2×2, up to 4×2),
   with a live minimap and standings
-- **4 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night
+- **10 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night, Autumn Woods, Beach Bay,
+  Lava Castle, Candy Land, Jungle Ruins and Cosmic Way (each also has its own battle arena)
 - **Drifting with mini-turbos** (blue → orange → pink sparks), boost pads, rocket starts
 - **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
   mushroom, triple mushroom, star and lightning
 - 50cc / 100cc / 150cc, 1–7 laps, cup points that carry across races
+- **Balloon Battle** mode: everyone starts with 3 balloons in a walled arena (themed like the
+  selected track). Each shell, banana or star hit pops one; ram a rival while boosting to steal
+  one. Out of balloons = eliminated (you keep driving as a ghost). Last one standing wins, or
+  whoever has the most balloons after 3 minutes
 - Hilly themed worlds with scenery, grandstand crowds, neon city skyline at night, sky with clouds and weather
 - Particle effects: drift sparks, tyre smoke, dust, boost flames, item explosions, confetti
 - Synthesized sound: engines with gear shifts, tyre screech, layered effects and an original soundtrack

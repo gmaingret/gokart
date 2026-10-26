@@ -69,11 +69,19 @@ export function drawViewportHud(g, r, k, race, time) {
     g.fillRect(r.x, r.y, r.w, r.h);
   }
 
-  // Lap + timer, top-left.
-  const lap = Math.min(race.laps, Math.max(1, k.lap));
-  outlined(g, `LAP ${lap}/${race.laps}`, r.x + pad, r.y + pad + 40 * s, 40 * s + 8, '#fff');
-  const t = k.finished ? k.finishTime : race.phase === 'race' ? race.clock : 0;
-  outlined(g, fmtTime(t), r.x + pad, r.y + pad + 80 * s + 8, 28 * s + 6, '#ffe66d');
+  if (race.mode === 'battle') {
+    // Balloons left + time remaining, top-left.
+    const n = k.ghost ? 0 : k.balloons;
+    outlined(g, n > 0 ? '🎈'.repeat(n) : 'OUT', r.x + pad, r.y + pad + 40 * s, 40 * s + 8, n > 0 ? '#fff' : '#ff5a5a');
+    const left = Math.max(0, 180 - (race.phase === 'race' ? race.clock : 0));
+    outlined(g, fmtTime(left).replace(/\.\d+$/, ''), r.x + pad, r.y + pad + 80 * s + 8, 28 * s + 6, left < 30 ? '#ff5a5a' : '#ffe66d');
+  } else {
+    // Lap + timer, top-left.
+    const lap = Math.min(race.laps, Math.max(1, k.lap));
+    outlined(g, `LAP ${lap}/${race.laps}`, r.x + pad, r.y + pad + 40 * s, 40 * s + 8, '#fff');
+    const t = k.finished ? k.finishTime : race.phase === 'race' ? race.clock : 0;
+    outlined(g, fmtTime(t), r.x + pad, r.y + pad + 80 * s + 8, 28 * s + 6, '#ffe66d');
+  }
   outlined(g, k.name, r.x + pad, r.y + pad + 115 * s + 12, 22 * s + 6, k.driver.color);
 
   // Item box, top-center.
@@ -137,6 +145,11 @@ export function drawViewportHud(g, r, k, race, time) {
     if (label) outlined(g, label, r.x + r.w / 2, r.y + r.h - pad, 34 * s + 10, ['#3fa9ff', '#ff9a1f', '#ff3fd2'][tier], 'center');
   }
 
+  if (k.ghost && race.mode === 'battle') {
+    g.fillStyle = 'rgba(0,0,0,0.25)';
+    g.fillRect(r.x, r.y, r.w, r.h);
+    outlined(g, 'ELIMINATED', r.x + r.w / 2, r.y + r.h * 0.6, 50 * s + 12, '#ff5a5a', 'center');
+  }
   if (k.wrongWay > 1.2 && !k.finished) {
     if (Math.floor(time * 3) % 2 === 0) outlined(g, 'WRONG WAY!', r.x + r.w / 2, r.y + r.h / 2, 60 * s + 14, '#ff4040', 'center');
   }
@@ -156,6 +169,7 @@ export function drawViewportHud(g, r, k, race, time) {
 }
 
 export function drawMinimap(g, r, track, karts) {
+  if (track.arena) return drawArenaMap(g, r, track.arena, karts);
   const cl = track.cl;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < cl.n; i++) {
@@ -197,6 +211,40 @@ export function drawMinimap(g, r, track, karts) {
   g.restore();
 }
 
+function drawArenaMap(g, r, arena, karts) {
+  const sc = (Math.min(r.w, r.h) / 2 / arena.R) * 0.9;
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const P = (x, z) => [cx - x * sc, cy - z * sc];
+  g.save();
+  g.beginPath();
+  g.arc(cx, cy, arena.R * sc, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(255,255,255,0.15)';
+  g.fill();
+  g.lineWidth = 4;
+  g.strokeStyle = 'rgba(255,255,255,0.85)';
+  g.stroke();
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  for (const o of arena.obstacles) {
+    const [x, y] = P(o.x, o.z);
+    g.beginPath();
+    g.arc(x, y, Math.max(2, o.r * sc), 0, Math.PI * 2);
+    g.fill();
+  }
+  const dot = Math.max(5, Math.min(r.w, r.h) / 30);
+  for (const k of karts) {
+    const [x, y] = P(k.x, k.z);
+    g.globalAlpha = k.ghost ? 0.3 : 1;
+    g.beginPath();
+    g.arc(x, y, k.human ? dot : dot * 0.75, 0, Math.PI * 2);
+    g.fillStyle = k.driver.color;
+    g.fill();
+    g.lineWidth = k.human ? 3 : 1.5;
+    g.strokeStyle = k.human ? '#fff' : '#000';
+    g.stroke();
+  }
+  g.restore();
+}
+
 export function drawStandings(g, r, order) {
   const rowH = Math.min(46, (r.h - 20) / 8);
   g.save();
@@ -206,7 +254,8 @@ export function drawStandings(g, r, order) {
     g.fillRect(r.x + 10, y, r.w - 20, rowH - 4);
     g.fillStyle = k.driver.color;
     g.fillRect(r.x + 10, y, 8, rowH - 4);
-    outlined(g, `${i + 1}. ${k.name}`, r.x + 28, y + rowH * 0.7, rowH * 0.55, k.human ? '#fff' : '#ccc');
+    const extra = k.balloons === undefined ? '' : k.ghost ? ' ✖' : ' ' + '🎈'.repeat(k.balloons);
+    outlined(g, `${i + 1}. ${k.name}${extra}`, r.x + 28, y + rowH * 0.7, rowH * 0.55, k.human ? '#fff' : '#ccc');
   });
   g.restore();
 }

@@ -195,6 +195,11 @@ export function sfx(name, arg) {
       noise(t, 0.5, { vol: 0.5, type: 'lowpass', freq: 2500, to: 120 });
       osc('sine', 120, t, 0.35, { vol: 0.35, slide: -80 });
       break;
+    case 'pop':
+      noise(t, 0.06, { vol: 0.5, type: 'highpass', freq: 1500 });
+      osc('sine', 900, t, 0.08, { vol: 0.2, slide: -600 });
+      osc('triangle', 1400, t + 0.04, 0.12, { vol: 0.08, slide: 900 });
+      break;
     case 'bump':
       osc('sine', 130, t, 0.12, { vol: 0.35, slide: -70 });
       noise(t, 0.08, { vol: 0.2, type: 'lowpass', freq: 900 });
@@ -364,6 +369,12 @@ const SONGS = {
   1: { bpm: 128, root: 62, scale: 'hijaz', prog: [0, 0, 6, 0, 3, 3, 1, 0], seed: 23, lead: 'sawtooth', drums: 'tribal', arp: 'updown' },
   2: { bpm: 134, root: 64, scale: 'major', prog: [0, 3, 5, 4, 0, 3, 1, 4], seed: 37, lead: 'triangle', drums: 'pop', arp: 'bell' },
   3: { bpm: 122, root: 57, scale: 'minor', prog: [0, 5, 2, 6, 0, 5, 3, 4], seed: 53, lead: 'sawtooth', drums: 'synth', arp: 'eighths' },
+  4: { bpm: 118, root: 62, scale: 'dorian', prog: [0, 3, 4, 3, 0, 5, 3, 4], seed: 101, lead: 'triangle', drums: 'pop', arp: 'updown' },
+  5: { bpm: 136, root: 65, scale: 'mixolydian', prog: [0, 3, 6, 3, 0, 4, 3, 0], seed: 113, lead: 'square', drums: 'tribal', arp: 'up' },
+  6: { bpm: 150, root: 52, scale: 'minor', prog: [0, 5, 6, 4, 0, 5, 3, 4], seed: 127, lead: 'sawtooth', drums: 'synth', arp: 'eighths' },
+  7: { bpm: 144, root: 67, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 1, 4], seed: 139, lead: 'square', drums: 'pop', arp: 'bell' },
+  8: { bpm: 126, root: 57, scale: 'dorian', prog: [0, 0, 6, 0, 3, 3, 4, 0], seed: 151, lead: 'triangle', drums: 'tribal', arp: 'updown' },
+  9: { bpm: 132, root: 61, scale: 'minor', prog: [0, 5, 3, 6, 0, 5, 3, 4], seed: 163, lead: 'sawtooth', drums: 'four', arp: 'fast' },
   lobby: { bpm: 96, root: 65, scale: 'major', prog: [0, 5, 3, 4, 0, 5, 1, 4], seed: 71, lead: null, drums: 'soft', arp: 'up' },
   results: { bpm: 118, root: 60, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 4, 4], seed: 89, lead: 'square', drums: 'pop', arp: 'up' },
   star: { bpm: 172, root: 67, scale: 'major', prog: [0, 0, 3, 4], seed: 97, lead: 'square', drums: 'four', arp: 'fast' },

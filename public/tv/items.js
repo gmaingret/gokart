@@ -13,9 +13,12 @@ const WEIGHTS = [
   { red: 20, mushroom: 15, triple: 30, star: 25, lightning: 10 },
 ];
 
-export function rollItem(place, racers, random = Math.random) {
+// Battle has no "position" to balance against, and no lightning.
+const BATTLE_WEIGHTS = { banana: 22, green: 28, red: 18, mushroom: 14, triple: 8, star: 10 };
+
+export function rollItem(place, racers, random = Math.random, battle = false) {
   const frac = racers > 1 ? (place - 1) / (racers - 1) : 0.4;
-  const table = WEIGHTS[Math.min(3, Math.floor(frac * 4))];
+  const table = battle ? BATTLE_WEIGHTS : WEIGHTS[Math.min(3, Math.floor(frac * 4))];
   const total = Object.values(table).reduce((a, b) => a + b, 0);
   let r = random() * total;
   for (const [k, w] of Object.entries(table)) {
@@ -123,7 +126,7 @@ export class Items {
   spawn(type, owner, opts = {}) {
     const mesh = type === 'banana' ? bananaMesh() : shellMesh(type === 'red' ? 0xe53935 : 0x2fbf4a);
     const o = { type, owner, mesh, life: type === 'banana' ? 120 : type === 'red' ? 10 : 7, bounces: 0, grace: 0.35, ...opts };
-    o.idx = this.track.cl.locate(o.x, o.z, owner.idx).idx;
+    o.idx = this.track.arena ? 0 : this.track.cl.locate(o.x, o.z, owner.idx).idx;
     mesh.position.set(o.x, 0, o.z);
     this.group.add(mesh);
     this.objects.push(o);
@@ -188,8 +191,18 @@ export class Items {
         const sp = Math.max(0, k.speed * dir);
         let target = null;
         if (type === 'red' && !back) {
-          const i = order.indexOf(k);
-          target = i > 0 ? order[i - 1] : null;
+          if (this.track.arena) {
+            // Battle: lock on to the nearest rival still in the game.
+            let best = Infinity;
+            for (const o of all) {
+              if (o === k || o.ghost) continue;
+              const d = (o.x - k.x) ** 2 + (o.z - k.z) ** 2;
+              if (d < best) ((best = d), (target = o));
+            }
+          } else {
+            const i = order.indexOf(k);
+            target = i > 0 ? order[i - 1] : null;
+          }
         }
         this.spawn(type, k, {
           x: k.x + fx * 2.6 * dir, z: k.z + fz * 2.6 * dir,
@@ -236,7 +249,7 @@ export class Items {
       if (k.roulette > 0) {
         k.roulette -= dt;
         if (k.roulette <= 0) {
-          k.item = rollItem(k.place, karts.length);
+          k.item = rollItem(k.place, karts.length, Math.random, !!this.track.arena);
           k.itemCount = k.item === 'triple' ? 3 : 1;
           k.emit('gotitem');
         }
@@ -256,6 +269,26 @@ export class Items {
         if (o.type === 'red') this.steerRed(o, dt, order);
         o.x += o.vx * dt;
         o.z += o.vz * dt;
+        if (this.track.arena) {
+          let dead = false;
+          for (const h of this.track.arena.constrain(o, 0.8)) {
+            const vn = o.vx * h.nx + o.vz * h.nz;
+            if (vn >= 0) continue;
+            o.vx -= 2 * vn * h.nx;
+            o.vz -= 2 * vn * h.nz;
+            if (++o.bounces > 6 || o.type === 'red') dead = true;
+          }
+          if (dead) {
+            this.boom(o);
+            this.remove(o);
+            continue;
+          }
+          o.mesh.rotation.y += dt * 12;
+          if (this.fx && Math.random() < 0.8) this.fx.trail(o.x, 0.5, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
+          o.mesh.position.set(o.x, 0, o.z);
+        }
+      }
+      if (o.type !== 'banana' && !this.track.arena) {
         const loc = cl.locate(o.x, o.z, o.idx);
         o.idx = loc.idx;
         const limit = WALL - 0.8;
@@ -317,10 +350,13 @@ export class Items {
 
   steerRed(o, dt, order) {
     const cl = this.track.cl;
-    const t = o.target && !o.target.finished ? o.target : null;
+    const t = o.target && !o.target.finished && !o.target.ghost ? o.target : null;
     let gx, gz;
     const tdx = t ? t.x - o.x : 0, tdz = t ? t.z - o.z : 0;
-    if (t && tdx * tdx + tdz * tdz < 30 * 30) {
+    if (this.track.arena) {
+      if (!t) return; // no one left to chase: fly straight
+      gx = t.x; gz = t.z;
+    } else if (t && tdx * tdx + tdz * tdz < 30 * 30) {
       gx = t.x; gz = t.z;
     } else {
       // Follow the track a little ahead, drifting toward the target's lane.

@@ -67,14 +67,110 @@ export const TRACKS = [
       road: '#221c36', wallA: 0x00e5ff, wallB: 0xff2bd6, curbA: 0x00e5ff, curbB: 0xff2bd6,
       banner: ['#00e5ff', '#ff2bd6', '#7d4dff', '#ffe14d'],
       hemi: [0x8a7dff, 0x200a40, 0.65], sun: [0xb3a6ff, 0.7], deco: 'pillar', mountains: 0x2a1a5a,
-      hills: 6, weather: 'motes', dust: 0x7d4dff, night: true, lamps: true,
+      hills: 6, weather: 'motes', dust: 0x7d4dff, night: true, lamps: true, skyline: true,
+    },
+    boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.25, 0.52, 0.76],
+  },
+  {
+    name: 'Autumn Woods',
+    points: [
+      [0, -170], [110, -175], [175, -120], [150, -50], [80, -40], [60, 20], [130, 60], [170, 130],
+      [110, 185], [20, 160], [-40, 190], [-120, 170], [-170, 100], [-130, 30], [-180, -50], [-110, -130],
+    ],
+    theme: {
+      sky: { top: 0x4f86c6, horizon: 0xffd7a8, bottom: 0xc4872f, sunDir: [0.6, 0.3, 0.2], sunColor: 0xffd0a0, sunSize: 1.4, clouds: 16, cloudColor: 0xfff0e0 },
+      fog: [0xffe0bc, 200, 850], ground: 0x9c7a2f, ground2: 0xc4872f, offroad: 0xa8762c, groundTex: 'grass',
+      road: '#4a4a4f', wallA: 0xffffff, wallB: 0xe67e22, curbA: 0xffffff, curbB: 0xe67e22,
+      banner: ['#d35400', '#ffffff', '#7b3f00', '#f1c40f'],
+      hemi: [0xfff0d8, 0x6b4a2a, 1.0], sun: [0xffe2b0, 2.3], deco: 'autumn', mountains: 0x8a6a4a,
+      hills: 26, weather: 'leaves', dust: 0x9a7a4a,
+    },
+    boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.27, 0.52, 0.78],
+  },
+  {
+    name: 'Beach Bay',
+    points: [
+      [-200, -40], [-150, -140], [-40, -170], [60, -130], [150, -160], [210, -80], [200, 30], [130, 60],
+      [150, 140], [60, 190], [-60, 160], [-120, 80], [-190, 60],
+    ],
+    theme: {
+      sky: { top: 0x2e9bea, horizon: 0xc8f1ff, bottom: 0x1fa3c9, sunDir: [0.3, 0.6, 0.4], clouds: 14 },
+      fog: [0xc8f1ff, 240, 950], ground: 0xf2dca0, ground2: 0xe8cc88, offroad: 0xead39a, groundTex: 'sand',
+      road: '#5b6068', wallA: 0xffffff, wallB: 0x00b4d8, curbA: 0xffffff, curbB: 0x00b4d8,
+      banner: ['#00b4d8', '#ffffff', '#ff6b6b', '#ffd166'],
+      hemi: [0xffffff, 0xb59b6a, 1.1], sun: [0xfff6e0, 2.6], deco: 'beach', mountains: 0x5fa86a,
+      hills: -14, water: 0x1fa3c9, dust: 0xf2dca0,
+    },
+    boxes: [0.13, 0.38, 0.63, 0.87], pads: [0.25, 0.5, 0.75],
+  },
+  {
+    name: 'Lava Castle',
+    points: [
+      [0, -160], [80, -160], [130, -110], [110, -50], [160, 0], [150, 90], [80, 130], [20, 90],
+      [-40, 140], [-120, 130], [-160, 60], [-110, 0], [-160, -70], [-90, -140],
+    ],
+    theme: {
+      sky: { top: 0x1a0505, horizon: 0x8a2a10, bottom: 0x2a0a05, sunDir: [0.2, 0.2, -0.8], sunColor: 0xff5a1f, sunSize: 4 },
+      fog: [0x3a120a, 140, 640], ground: 0x2a2224, ground2: 0x3a2a26, offroad: 0x3a2c28, groundTex: 'rock',
+      road: '#2e2a2c', wallA: 0x1a1a1a, wallB: 0xff4d00, curbA: 0xff4d00, curbB: 0x1a1a1a,
+      banner: ['#ff4d00', '#1a1a1a', '#ffb000', '#ffffff'],
+      hemi: [0xff9a6a, 0x2a0a05, 0.85], sun: [0xff8a50, 1.7], deco: 'lava', mountains: 0x3a1a14,
+      hills: 40, weather: 'embers', dust: 0x555555, glowCurbs: true,
+    },
+    boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.27, 0.53, 0.8],
+  },
+  {
+    name: 'Candy Land',
+    points: [
+      [-180, 0], [-150, -110], [-60, -150], [20, -90], [80, -160], [170, -120], [180, -20], [120, 30],
+      [180, 110], [110, 180], [20, 140], [-60, 190], [-140, 130],
+    ],
+    theme: {
+      sky: { top: 0x9fd3ff, horizon: 0xffe0f0, bottom: 0xffb3d9, sunDir: [0.4, 0.5, 0.3], sunColor: 0xfff0f8, clouds: 24, cloudColor: 0xfff4fb },
+      fog: [0xffe0f0, 200, 850], ground: 0xffb3d9, ground2: 0xffd1e8, offroad: 0xffc4e1, groundTex: 'grass',
+      road: '#5a3a2a', wallA: 0xffffff, wallB: 0xff6fb5, curbA: 0xffffff, curbB: 0xff6fb5,
+      banner: ['#ff6fb5', '#ffffff', '#7fdbff', '#b784ff'],
+      hemi: [0xffffff, 0xd08ab0, 1.15], sun: [0xfff0f8, 2.2], deco: 'candy', mountains: 0xffc4e1, snowcaps: true,
+      hills: 18, weather: 'sprinkles', dust: 0xffd1e8,
+    },
+    boxes: [0.14, 0.39, 0.64, 0.88], pads: [0.26, 0.51, 0.77],
+  },
+  {
+    name: 'Jungle Ruins',
+    points: [
+      [0, -190], [120, -170], [190, -90], [140, -20], [190, 60], [140, 150], [50, 150], [-10, 90],
+      [-80, 150], [-150, 150], [-200, 60], [-140, -20], [-190, -110], [-100, -170],
+    ],
+    theme: {
+      sky: { top: 0x5fa0d0, horizon: 0xd9f2d0, bottom: 0x2f7a2f, sunDir: [0.3, 0.7, 0.2], clouds: 18 },
+      fog: [0xcfe8c8, 120, 600], ground: 0x2f7a2f, ground2: 0x4f9a3a, offroad: 0x5a7a2a, groundTex: 'grass',
+      road: '#5a4a3a', wallA: 0x8d6e63, wallB: 0x2e7d32, curbA: 0xffcf33, curbB: 0x2e7d32,
+      banner: ['#2e7d32', '#ffcf33', '#8d6e63', '#ffffff'],
+      hemi: [0xe8ffe0, 0x2a4a1a, 1.0], sun: [0xfff6d0, 2.0], deco: 'jungle', mountains: 0x3f6f3f,
+      hills: 30, weather: 'pollen', dust: 0x6a5a3a,
+    },
+    boxes: [0.13, 0.38, 0.63, 0.87], pads: [0.25, 0.5, 0.76],
+  },
+  {
+    name: 'Cosmic Way',
+    points: [
+      [-170, -120], [-40, -190], [90, -150], [60, -70], [150, -40], [200, 60], [120, 150], [0, 180],
+      [-60, 100], [-140, 160], [-210, 70], [-150, -10],
+    ],
+    theme: {
+      sky: { top: 0x02010a, horizon: 0x1a1050, bottom: 0x050318, sunDir: [-0.3, 0.3, 0.7], sunColor: 0x7d4dff, sunSize: 8, stars: true },
+      fog: [0x0d0828, 160, 700], ground: 0x0b0a20, ground2: 0x14123a, offroad: 0x1a1640, groundTex: 'grid',
+      road: '#1a1a3a', wallA: 0x7d4dff, wallB: 0x00e5ff, curbA: 0x7d4dff, curbB: 0x00e5ff,
+      banner: ['#7d4dff', '#00e5ff', '#ff2bd6', '#ffffff'],
+      hemi: [0x9a8aff, 0x100830, 0.7], sun: [0xb3a6ff, 0.7], deco: 'crystal', mountains: 0x2a1f6a,
+      hills: 20, weather: 'motes', dust: 0x7d4dff, night: true, lamps: true, rainbowRoad: true,
     },
     boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.25, 0.52, 0.76],
   },
 ];
 
 // Seeded PRNG so decorations are identical every time a track loads.
-function rng(seed) {
+export function rng(seed) {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -167,7 +263,7 @@ export function buildCenterline(def) {
   return { n, length, seg, px, pz, tx, tz, nx, nz, wrap, locate, pointAt, minSelfDistance };
 }
 
-function canvasTexture(w, h, draw, repeat = true) {
+export function canvasTexture(w, h, draw, repeat = true) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -192,7 +288,7 @@ function valueNoise(x, y, seed) {
   const c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
-function fbm(x, y, seed, oct = 4) {
+export function fbm(x, y, seed, oct = 4) {
   let s = 0, a = 0.5, f = 1;
   for (let i = 0; i < oct; i++) {
     s += valueNoise(x * f, y * f, seed + i) * a;
@@ -201,7 +297,7 @@ function fbm(x, y, seed, oct = 4) {
   }
   return s;
 }
-const smooth = (a, b, x) => {
+export const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
@@ -234,7 +330,7 @@ function distanceField(cl) {
 }
 
 // ---------------------------------------------------------------- textures
-function roadTexture(base, night) {
+export function roadTexture(base, night, rainbow = false) {
   return canvasTexture(256, 512, (g, w, h) => {
     g.fillStyle = base;
     g.fillRect(0, 0, w, h);
@@ -259,6 +355,14 @@ function roadTexture(base, night) {
       g.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.06})`;
       g.fillRect(r() * w, r() * h, 20 + r() * 50, 30 + r() * 80);
     }
+    if (rainbow) {
+      const grd = g.createLinearGradient(0, 0, w, 0);
+      ['#ff2b2b', '#ff9f1c', '#ffe14d', '#3dff6e', '#00e5ff', '#7d4dff', '#ff2bd6'].forEach((c, i, a) => grd.addColorStop(i / (a.length - 1), c));
+      g.globalAlpha = 0.45;
+      g.fillStyle = grd;
+      g.fillRect(0, 0, w, h);
+      g.globalAlpha = 1;
+    }
     g.fillStyle = night ? '#ffe36e' : 'rgba(255,255,255,0.92)';
     g.fillRect(8, 0, 7, h);
     g.fillRect(w - 15, 0, 7, h);
@@ -267,7 +371,7 @@ function roadTexture(base, night) {
   });
 }
 
-function groundTexture(kind) {
+export function groundTexture(kind) {
   return canvasTexture(256, 256, (g, w, h) => {
     const r = rng(kind.length * 31);
     if (kind === 'grid') {
@@ -299,6 +403,9 @@ function groundTexture(kind) {
       } else if (kind === 'sand') {
         g.fillStyle = `rgba(${v > 0.5 ? '255,255,255' : '120,80,30'},${0.06 + r() * 0.1})`;
         g.fillRect(r() * w, r() * h, 2, 2);
+      } else if (kind === 'rock') {
+        g.fillStyle = v > 0.97 ? `rgba(255,${90 + r() * 80},0,0.9)` : `rgba(${v > 0.5 ? '255,255,255' : '0,0,0'},${0.05 + r() * 0.12})`;
+        g.fillRect(r() * w, r() * h, 1 + r() * 4, 1 + r() * 4);
       } else {
         g.fillStyle = `rgba(${v > 0.6 ? '255,255,255' : '150,180,220'},${0.06 + r() * 0.12})`;
         g.fillRect(r() * w, r() * h, 2 + r() * 3, 2 + r() * 3);
@@ -317,7 +424,7 @@ function groundTexture(kind) {
   });
 }
 
-function checkerTexture(cells = 8) {
+export function checkerTexture(cells = 8) {
   return canvasTexture(256, 64, (g, w, h) => {
     const s = w / (cells * 2);
     for (let y = 0; y < h / s; y++)
@@ -329,7 +436,7 @@ function checkerTexture(cells = 8) {
 }
 
 const BANNER_WORDS = ['GOKART', 'TURBO', 'ZOOM!', 'DRIFT', '★★★', 'GO GO', 'NITRO', 'VROOM'];
-function bannerTexture(colors) {
+export function bannerTexture(colors) {
   return canvasTexture(1024, 64, (g, w, h) => {
     const panel = w / 4;
     for (let i = 0; i < 4; i++) {
@@ -350,7 +457,7 @@ function bannerTexture(colors) {
   });
 }
 
-function glowTexture() {
+export function glowTexture() {
   return canvasTexture(128, 128, (g, w) => {
     const grd = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
     grd.addColorStop(0, 'rgba(255,255,255,1)');
@@ -417,7 +524,7 @@ function barrier(cl, lat, height, group, bannerMat, railMat) {
   group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.floor(n / 2), 0.18, 6, true), railMat));
 }
 
-function instanced(geo, mat, transforms) {
+export function instanced(geo, mat, transforms) {
   const inst = new THREE.InstancedMesh(geo, mat, Math.max(1, transforms.length));
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
@@ -430,8 +537,18 @@ function instanced(geo, mat, transforms) {
   return inst;
 }
 
+// Sea around low-lying tracks (terrain dips below it away from the road).
+export function waterPlane(theme, cx, cz) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(3000, 3000).rotateX(-Math.PI / 2),
+    new THREE.MeshLambertMaterial({ color: theme.water, emissive: theme.water, emissiveIntensity: 0.25, transparent: true, opacity: 0.88 })
+  );
+  m.position.set(cx, -1.4, cz);
+  return m;
+}
+
 // ---------------------------------------------------------------- scenery
-function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
+export function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
   const r = rng(seed);
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < cl.n; i++) {
@@ -448,7 +565,9 @@ function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
     if (avoid.some(([ax, az, ar]) => (x - ax) ** 2 + (z - az) ** 2 < ar * ar)) continue;
     // Denser near the track so the drive feels lush.
     if (d > 45 && r() < 0.5) continue;
-    spots.push([x, heightAt(x, z), z, 0.7 + r() * 0.8, r() * Math.PI * 2]);
+    const y = heightAt(x, z);
+    if (theme.water && y < -1) continue; // nothing growing under the sea
+    spots.push([x, y, z, 0.7 + r() * 0.8, r() * Math.PI * 2]);
   }
 
   const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
@@ -510,6 +629,76 @@ function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
       add(new THREE.CylinderGeometry(0.4, 0.45, 0.6, 10).translate(0, 4.2, 0), lam(0x222222), C);
       break;
     }
+    case 'autumn': {
+      add(new THREE.CylinderGeometry(0.45, 0.7, 3.2, 7).translate(0, 1.6, 0), lam(0x5d3a1a), [...A, ...B, ...C]);
+      add(new THREE.IcosahedronGeometry(3, 1).translate(0, 5.2, 0), flat(0xe67e22), A);
+      add(new THREE.IcosahedronGeometry(3, 1).translate(0, 5.2, 0), flat(0xc0392b), B);
+      add(new THREE.IcosahedronGeometry(3, 1).translate(0, 5.2, 0), flat(0xf1c40f), C);
+      add(new THREE.IcosahedronGeometry(2, 1).translate(1.2, 6.8, 0.4), flat(0xd35400), A);
+      // Pumpkins and leaf piles
+      add(new THREE.SphereGeometry(0.6, 10, 8).scale(1.2, 0.85, 1.2).translate(2.5, 0.5, 1.5), lam(0xff7a1f), B);
+      add(new THREE.SphereGeometry(1.4, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.4, 0.5, 1.2).translate(-2.2, 0, -1), flat(0xb5651d), C);
+      break;
+    }
+    case 'beach': {
+      const palm = [...A, ...B];
+      add(new THREE.CylinderGeometry(0.3, 0.45, 7, 6).translate(0, 3.5, 0).rotateZ(0.12), lam(0x9a7a4a), palm);
+      for (let k = 0; k < 6; k++) {
+        const leaf = new THREE.ConeGeometry(0.6, 4.2, 4).rotateZ(Math.PI / 2.3).translate(2.2, 6.8, 0).rotateY((k / 6) * Math.PI * 2);
+        add(leaf, flat(0x2fae4f), palm);
+      }
+      add(new THREE.SphereGeometry(0.35, 8, 6).translate(0.6, 6.4, 0.3), lam(0x6b4a2a), palm);
+      // Beach umbrellas + towels
+      add(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 5).translate(0, 1.3, 0), lam(0xffffff), C);
+      add(new THREE.ConeGeometry(1.8, 0.7, 8, 1, true).translate(0, 2.6, 0), new THREE.MeshLambertMaterial({ color: 0xff6b6b, side: THREE.DoubleSide }), C);
+      add(new THREE.BoxGeometry(1, 0.05, 2).translate(1.6, 0.03, 0.5), lam(0xffd166), C);
+      break;
+    }
+    case 'lava': {
+      add(new THREE.DodecahedronGeometry(2.4, 0).scale(1.2, 0.9, 1).translate(0, 1, 0), flat(0x2b2326), A);
+      add(new THREE.CircleGeometry(3.5, 14).rotateX(-Math.PI / 2).translate(0, 0.15, 0), new THREE.MeshBasicMaterial({ color: 0xff5a00 }), B);
+      add(new THREE.CircleGeometry(2.2, 14).rotateX(-Math.PI / 2).translate(0.4, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0xffc040 }), B);
+      add(new THREE.ConeGeometry(1.1, 6, 5).translate(0, 3, 0), flat(0x3a1f3a), C);
+      add(new THREE.ConeGeometry(0.7, 3.6, 5).translate(1.4, 1.8, 0.6), flat(0x4a2a4a), C);
+      break;
+    }
+    case 'candy': {
+      const stick = lam(0xffffff);
+      add(new THREE.CylinderGeometry(0.15, 0.15, 5, 6).translate(0, 2.5, 0), stick, [...A, ...B]);
+      add(new THREE.CylinderGeometry(1.8, 1.8, 0.4, 20).rotateX(Math.PI / 2).translate(0, 5.6, 0), lam(0xff6fb5), A);
+      add(new THREE.CylinderGeometry(1.8, 1.8, 0.4, 20).rotateX(Math.PI / 2).translate(0, 5.6, 0), lam(0x7fdbff), B);
+      add(new THREE.TorusGeometry(1.1, 0.12, 6, 20).translate(0, 5.6, 0.22), lam(0xffffff), [...A, ...B]);
+      // Gumdrops
+      const gum = new THREE.SphereGeometry(1.2, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 1.3, 1);
+      add(gum, lam(0xb784ff), C.filter((_, i) => i % 3 === 0));
+      add(gum, lam(0x7dff6e), C.filter((_, i) => i % 3 === 1));
+      add(gum, lam(0xffcf33), C.filter((_, i) => i % 3 === 2));
+      break;
+    }
+    case 'jungle': {
+      add(new THREE.CylinderGeometry(0.6, 1.0, 9, 8).translate(0, 4.5, 0), lam(0x5a3d22), A);
+      add(new THREE.IcosahedronGeometry(4.5, 1).scale(1.3, 0.55, 1.3).translate(0, 9.5, 0), flat(0x1f6a2a), A);
+      for (let k = 0; k < 5; k++) {
+        const frond = new THREE.ConeGeometry(0.5, 3, 3).rotateZ(Math.PI / 2.8).translate(1.4, 0.8, 0).rotateY((k / 5) * Math.PI * 2);
+        add(frond, flat(0x3f9a3a), B);
+      }
+      // Mossy ruins
+      const stone = flat(0x8a8f7a);
+      add(new THREE.BoxGeometry(3, 2, 3).translate(0, 1, 0), stone, C);
+      add(new THREE.BoxGeometry(2, 1.6, 2).translate(0.3, 2.8, 0.2), stone, C);
+      add(new THREE.BoxGeometry(1.2, 4, 1.2).translate(-2.6, 2, 1.2), stone, C);
+      add(new THREE.BoxGeometry(3.1, 0.3, 3.1).translate(0, 2.05, 0), flat(0x4f8a3a), C);
+      break;
+    }
+    case 'crystal': {
+      const cry = new THREE.OctahedronGeometry(1.4, 0).scale(0.7, 2.6, 0.7).translate(0, 3, 0);
+      add(cry, new THREE.MeshBasicMaterial({ color: 0x00e5ff }), A);
+      add(cry.clone().rotateZ(0.4).translate(1.4, -0.6, 0), new THREE.MeshBasicMaterial({ color: 0x7d4dff }), A);
+      add(cry, new THREE.MeshBasicMaterial({ color: 0xff2bd6 }), B);
+      add(new THREE.DodecahedronGeometry(2.2, 0).translate(0, 9, 0), flat(0x3a3550), C);
+      add(new THREE.TorusGeometry(3.2, 0.12, 6, 30).rotateX(1.2).translate(0, 9, 0), new THREE.MeshBasicMaterial({ color: 0xffe14d }), C);
+      break;
+    }
     case 'pillar': {
       add(new THREE.BoxGeometry(1.4, 12, 1.4).translate(0, 6, 0), lam(0x1a1838), A);
       add(new THREE.BoxGeometry(1.6, 0.5, 1.6).translate(0, 12, 0), new THREE.MeshBasicMaterial({ color: 0xff2bd6 }), A);
@@ -528,7 +717,7 @@ function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
 
   // Distant ring: mountains, or a city skyline at night.
   const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-  if (theme.night) {
+  if (theme.skyline) {
     const winTex = canvasTexture(64, 128, (g, w, h) => {
       g.fillStyle = '#0d0a1e';
       g.fillRect(0, 0, w, h);
@@ -650,11 +839,15 @@ function grandstandSpot(cl) {
 
 function grandstand(cl, theme, group) {
   const { i, x, z } = grandstandSpot(cl);
-  const side = 1;
+  // Face the track: local +z points toward the road.
+  return grandstandAt(group, theme, x, z, Math.atan2(-cl.nx[i], -cl.nz[i]));
+}
+
+// Grandstand at (x, z); local +z (the front row) points along `rotY`.
+export function grandstandAt(group, theme, x, z, rotY) {
   const stand = new THREE.Group();
   stand.position.set(x, 0, z);
-  // Face the track: local +z points toward the road.
-  stand.rotation.y = Math.atan2(-cl.nx[i] * side, -cl.nz[i] * side);
+  stand.rotation.y = rotY;
   const L = 44;
   const concrete = new THREE.MeshLambertMaterial({ color: theme.night ? 0x2a2440 : 0xb0b4bc });
   const seatMats = theme.banner.map((c) => new THREE.MeshLambertMaterial({ color: c }));
@@ -735,7 +928,7 @@ export function buildTrack(index) {
     const h = heightAt(x, z);
     tp.setY(i, h);
     c.copy(g1).lerp(g2, fbm(x / 40, z / 40, seed + 9, 3));
-    if (theme.snowcaps && h > hills * 0.75) c.lerp(white, Math.min(1, (h - hills * 0.75) / 6));
+    if (theme.snowcaps && hills > 0 && h > hills * 0.75) c.lerp(white, Math.min(1, (h - hills * 0.75) / 6));
     tcol[i * 3] = c.r; tcol[i * 3 + 1] = c.g; tcol[i * 3 + 2] = c.b;
   }
   tGeo.setAttribute('color', new THREE.BufferAttribute(tcol, 3));
@@ -747,6 +940,7 @@ export function buildTrack(index) {
     : new THREE.MeshLambertMaterial({ vertexColors: true, map: gTex });
   if (theme.groundTex === 'grid') gTex.repeat.set(SIZE / 10, SIZE / 10);
   group.add(new THREE.Mesh(tGeo, terrainMat));
+  if (theme.water) group.add(waterPlane(theme, cx, cz));
 
   const vc = { vertexColors: true };
   const offTex = groundTexture(theme.groundTex === 'grid' ? 'snow' : theme.groundTex);
@@ -762,7 +956,7 @@ export function buildTrack(index) {
   group.add(new THREE.Mesh(offUV(ribbon(cl, -WALL - 1, -ROAD_HALF - CURB, 0.01)), off));
   group.add(new THREE.Mesh(offUV(ribbon(cl, ROAD_HALF + CURB, WALL + 1, 0.01)), off));
 
-  const roadTex = roadTexture(theme.road, theme.night);
+  const roadTex = roadTexture(theme.road, theme.night, theme.rainbowRoad);
   const road = new THREE.Mesh(
     ribbon(cl, -ROAD_HALF, ROAD_HALF, 0.03, null, 10),
     new THREE.MeshLambertMaterial({ map: roadTex, side: THREE.DoubleSide })
@@ -771,7 +965,7 @@ export function buildTrack(index) {
 
   const ca = new THREE.Color(theme.curbA), cb = new THREE.Color(theme.curbB);
   const curbColor = (i, c) => c.copy(Math.floor(i / 2) % 2 ? ca : cb);
-  const CurbMat = theme.night ? THREE.MeshBasicMaterial : THREE.MeshLambertMaterial;
+  const CurbMat = theme.night || theme.glowCurbs ? THREE.MeshBasicMaterial : THREE.MeshLambertMaterial;
   const curbMat = new CurbMat({ ...vc, side: THREE.DoubleSide });
   group.add(new THREE.Mesh(ribbon(cl, -ROAD_HALF - CURB, -ROAD_HALF, 0.05, curbColor), curbMat));
   group.add(new THREE.Mesh(ribbon(cl, ROAD_HALF, ROAD_HALF + CURB, 0.05, curbColor), curbMat));

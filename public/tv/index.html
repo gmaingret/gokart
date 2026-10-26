@@ -32,6 +32,7 @@
       </div>
       <div class="panel settings" id="settings">
         <h2>Race setup</h2>
+        <div class="row" data-k="mode"><span>Mode</span><button class="dec">◀</button><b id="vMode"></b><button class="inc">▶</button></div>
         <div class="row" data-k="track"><span>Track</span><button class="dec">◀</button><b id="vTrack"></b><button class="inc">▶</button></div>
         <div class="row" data-k="laps"><span>Laps</span><button class="dec">◀</button><b id="vLaps"></b><button class="inc">▶</button></div>
         <div class="row" data-k="cc"><span>Speed</span><button class="dec">◀</button><b id="vCc"></b><button class="inc">▶</button></div>
@@ -46,7 +47,7 @@
   <section id="results" class="screen hidden">
     <h1 id="resultsTitle">Results</h1>
     <table>
-      <thead><tr><th>#</th><th>Racer</th><th>Time</th><th>Points</th><th>Total</th></tr></thead>
+      <thead><tr><th>#</th><th>Racer</th><th id="resultsTimeCol">Time</th><th>Points</th><th>Total</th></tr></thead>
       <tbody id="resultsBody"></tbody>
     </table>
     <p class="hint">Captain: tap <b>Continue</b> on your phone (or press OK on the TV)</p>

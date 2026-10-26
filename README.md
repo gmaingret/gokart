@@ -11,6 +11,10 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
   mushroom, triple mushroom, star and lightning
 - 50cc / 100cc / 150cc, 1–7 laps, cup points that carry across races
+- **Balloon Battle** mode: everyone starts with 3 balloons in a walled arena (themed like the
+  selected track). Each shell, banana or star hit pops one; ram a rival while boosting to steal
+  one. Out of balloons = eliminated (you keep driving as a ghost). Last one standing wins, or
+  whoever has the most balloons after 3 minutes
 - Hilly themed worlds with scenery, grandstand crowds, neon city skyline at night, sky with clouds and weather
 - Particle effects: drift sparks, tyre smoke, dust, boost flames, item explosions, confetti
 - Synthesized sound: engines with gear shifts, tyre screech, layered effects and an original soundtrack

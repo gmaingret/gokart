@@ -74,7 +74,7 @@ export const TRACKS = [
 ];
 
 // Seeded PRNG so decorations are identical every time a track loads.
-function rng(seed) {
+export function rng(seed) {
   let s = seed >>> 0;
   return () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -167,7 +167,7 @@ export function buildCenterline(def) {
   return { n, length, seg, px, pz, tx, tz, nx, nz, wrap, locate, pointAt, minSelfDistance };
 }
 
-function canvasTexture(w, h, draw, repeat = true) {
+export function canvasTexture(w, h, draw, repeat = true) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -192,7 +192,7 @@ function valueNoise(x, y, seed) {
   const c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
-function fbm(x, y, seed, oct = 4) {
+export function fbm(x, y, seed, oct = 4) {
   let s = 0, a = 0.5, f = 1;
   for (let i = 0; i < oct; i++) {
     s += valueNoise(x * f, y * f, seed + i) * a;
@@ -201,7 +201,7 @@ function fbm(x, y, seed, oct = 4) {
   }
   return s;
 }
-const smooth = (a, b, x) => {
+export const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
@@ -234,7 +234,7 @@ function distanceField(cl) {
 }
 
 // ---------------------------------------------------------------- textures
-function roadTexture(base, night) {
+export function roadTexture(base, night) {
   return canvasTexture(256, 512, (g, w, h) => {
     g.fillStyle = base;
     g.fillRect(0, 0, w, h);
@@ -267,7 +267,7 @@ function roadTexture(base, night) {
   });
 }
 
-function groundTexture(kind) {
+export function groundTexture(kind) {
   return canvasTexture(256, 256, (g, w, h) => {
     const r = rng(kind.length * 31);
     if (kind === 'grid') {
@@ -317,7 +317,7 @@ function groundTexture(kind) {
   });
 }
 
-function checkerTexture(cells = 8) {
+export function checkerTexture(cells = 8) {
   return canvasTexture(256, 64, (g, w, h) => {
     const s = w / (cells * 2);
     for (let y = 0; y < h / s; y++)
@@ -329,7 +329,7 @@ function checkerTexture(cells = 8) {
 }
 
 const BANNER_WORDS = ['GOKART', 'TURBO', 'ZOOM!', 'DRIFT', '★★★', 'GO GO', 'NITRO', 'VROOM'];
-function bannerTexture(colors) {
+export function bannerTexture(colors) {
   return canvasTexture(1024, 64, (g, w, h) => {
     const panel = w / 4;
     for (let i = 0; i < 4; i++) {
@@ -350,7 +350,7 @@ function bannerTexture(colors) {
   });
 }
 
-function glowTexture() {
+export function glowTexture() {
   return canvasTexture(128, 128, (g, w) => {
     const grd = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
     grd.addColorStop(0, 'rgba(255,255,255,1)');
@@ -417,7 +417,7 @@ function barrier(cl, lat, height, group, bannerMat, railMat) {
   group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.floor(n / 2), 0.18, 6, true), railMat));
 }
 
-function instanced(geo, mat, transforms) {
+export function instanced(geo, mat, transforms) {
   const inst = new THREE.InstancedMesh(geo, mat, Math.max(1, transforms.length));
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
@@ -431,7 +431,7 @@ function instanced(geo, mat, transforms) {
 }
 
 // ---------------------------------------------------------------- scenery
-function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
+export function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
   const r = rng(seed);
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < cl.n; i++) {
@@ -650,11 +650,15 @@ function grandstandSpot(cl) {
 
 function grandstand(cl, theme, group) {
   const { i, x, z } = grandstandSpot(cl);
-  const side = 1;
+  // Face the track: local +z points toward the road.
+  return grandstandAt(group, theme, x, z, Math.atan2(-cl.nx[i], -cl.nz[i]));
+}
+
+// Grandstand at (x, z); local +z (the front row) points along `rotY`.
+export function grandstandAt(group, theme, x, z, rotY) {
   const stand = new THREE.Group();
   stand.position.set(x, 0, z);
-  // Face the track: local +z points toward the road.
-  stand.rotation.y = Math.atan2(-cl.nx[i] * side, -cl.nz[i] * side);
+  stand.rotation.y = rotY;
   const L = 44;
   const concrete = new THREE.MeshLambertMaterial({ color: theme.night ? 0x2a2440 : 0xb0b4bc });
   const seatMats = theme.banner.map((c) => new THREE.MeshLambertMaterial({ color: c }));

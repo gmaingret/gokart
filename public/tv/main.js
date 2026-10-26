@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { DRIVERS, TRACK_NAMES, CC_OPTIONS, MAX_RACERS, POINTS, ordinal } from '../shared/config.js';
 import { buildTrack, TRACKS } from './track.js';
+import { buildArena } from './arena.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Kart, collideKarts, DRIFT_TIERS, setLowQuality } from './kart.js';
 import { FX } from './fx.js';
 import { Sky } from './sky.js';
 import { Items } from './items.js';
-import { driveBot, botSpeedMult } from './ai.js';
+import { driveBot, botSpeedMult, driveBattle } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
 import * as audio from './audio.js';
 
@@ -20,7 +21,9 @@ const COUNTDOWN = 4;
 const $ = (id) => document.getElementById(id);
 
 // ---------------------------------------------------------------- state
-const cfg = { track: 0, laps: 3, cc: 100, bots: 4, gfx: loadGfx() };
+const cfg = { mode: 'race', track: 0, laps: 3, cc: 100, bots: 4, gfx: loadGfx() };
+const BATTLE_TIME = 180; // seconds
+const BALLOONS = 3;
 
 function loadGfx() {
   try {
@@ -84,6 +87,7 @@ applyGfx();
 // ---------------------------------------------------------------- track
 let track = null;
 let trackIndex = -1;
+let venueKey = '';
 let lobbyS = 0;
 
 function disposeTree(obj) {
@@ -97,14 +101,17 @@ function disposeTree(obj) {
   });
 }
 
+// Loads the circuit, or in battle mode the arena themed like that circuit.
 function loadTrack(i) {
-  if (i === trackIndex) return;
+  const key = `${cfg.mode}:${i}`;
+  if (key === venueKey) return;
   if (track) {
     scene.remove(track.group);
     disposeTree(track.group);
   }
+  venueKey = key;
   trackIndex = i;
-  track = buildTrack(i);
+  track = cfg.mode === 'battle' ? buildArena(i) : buildTrack(i);
   scene.add(track.group);
   const t = track.theme;
   sky.setTheme(t.sky, track.center);
@@ -218,7 +225,7 @@ function onPlayer(p, m) {
       break;
     }
     case 'cfg':
-      if (isCaptain && phase === 'lobby' && ['track', 'laps', 'cc', 'bots'].includes(m.k)) changeCfg(m.k, m.d);
+      if (isCaptain && phase === 'lobby' && ['mode', 'track', 'laps', 'cc', 'bots'].includes(m.k)) changeCfg(m.k, m.d);
       break;
     case 'start':
       if (isCaptain && phase === 'lobby') startRace();
@@ -242,12 +249,13 @@ function freeDriver() {
 }
 
 // ---------------------------------------------------------------- lobby UI
-const ROWS = ['track', 'laps', 'cc', 'bots', 'gfx', 'start'];
+const ROWS = ['mode', 'track', 'laps', 'cc', 'bots', 'gfx', 'start'];
 const START_ROW = ROWS.indexOf('start');
 let focusRow = START_ROW;
 
 function changeCfg(k, dir) {
   dir = Math.sign(dir) || 1;
+  if (k === 'mode') cfg.mode = cfg.mode === 'race' ? 'battle' : 'race';
   if (k === 'track') cfg.track = (cfg.track + dir + TRACKS.length) % TRACKS.length;
   if (k === 'laps') cfg.laps = Math.max(1, Math.min(7, cfg.laps + dir));
   if (k === 'cc') {
@@ -291,12 +299,16 @@ function lobbyChanged() {
     list.appendChild(li);
   }
   $('playerCount').textContent = `${ps.length}/${MAX_RACERS}`;
-  $('vTrack').textContent = TRACK_NAMES[cfg.track];
-  $('vLaps').textContent = cfg.laps;
+  const battle = cfg.mode === 'battle';
+  $('vMode').textContent = battle ? '🎈 Balloon Battle' : '🏁 Race';
+  $('vTrack').textContent = TRACK_NAMES[cfg.track] + (battle ? ' Arena' : '');
+  $('vLaps').textContent = battle ? `${BATTLE_TIME / 60} min` : cfg.laps;
+  document.querySelector('#settings [data-k="laps"] span').textContent = battle ? 'Time' : 'Laps';
   $('vCc').textContent = `${cfg.cc}cc`;
   $('vBots').textContent = cfg.bots;
   $('vGfx').textContent = cfg.gfx === 'high' ? 'High' : 'Low (faster)';
   $('startBtn').disabled = ps.length === 0;
+  $('startBtn').textContent = battle ? 'Start battle' : 'Start race';
   document.querySelectorAll('#settings .row').forEach((r, i) => r.classList.toggle('focus', i === focusRow));
 
   const msg = {
@@ -428,8 +440,13 @@ function startRace() {
     p.input.lastItem = p.input.itemCount;
     karts.push(k);
   }
+  const battle = cfg.mode === 'battle';
   karts.forEach((k, i) => {
     k.reset(track.grid[i]);
+    if (battle) {
+      k.balloons = BALLOONS;
+      k.setBalloons(BALLOONS);
+    }
     scene.add(k.model.root);
   });
   const humanKarts = karts.filter((k) => k.human);
@@ -440,6 +457,8 @@ function startRace() {
     cams,
     track,
     items: new Items(scene, track, playSfx, fx),
+    mode: cfg.mode,
+    outCount: 0,
     order: [...karts],
     laps: cfg.laps,
     cc: CC[cfg.cc],
@@ -549,7 +568,7 @@ function stepRace(dt) {
     const p = k.player;
     const auto = !k.human || !p?.connected || k.finished || r.phase === 'results';
     if (auto) {
-      driveBot(k, dt, r);
+      (r.mode === 'battle' ? driveBattle : driveBot)(k, dt, r);
     } else {
       const i = p.input;
       k.input.steer = i.steer;
@@ -559,8 +578,8 @@ function stepRace(dt) {
       k.input.item = i.itemCount !== i.lastItem;
       i.lastItem = i.itemCount;
     }
-    if (k.input.item) r.items.use(k, r.order, r.karts);
-    const mult = k.human && !auto ? 1 : k.human ? r.cc.bot : botSpeedMult(k, leaderHuman, r.cc.bot);
+    if (k.input.item && !k.ghost) r.items.use(k, r.order, r.karts);
+    const mult = k.human && !auto ? 1 : k.human || r.mode === 'battle' ? r.cc.bot : botSpeedMult(k, leaderHuman, r.cc.bot);
     k.step(dt, r.track, r.cc, mult);
 
     // Boost pads.
@@ -600,11 +619,18 @@ function stepRace(dt) {
       }
     }
   }
-  collideKarts(r.karts);
-  r.items.update(dt, r.karts, r.order, r.time);
+  const alive = r.mode === 'battle' ? r.karts.filter((k) => !k.ghost) : r.karts;
+  if (r.mode === 'battle') ramSteals(alive);
+  collideKarts(alive);
+  r.items.update(dt, alive, r.order, r.time);
 
-  // Race order.
+  // Order: race by progress; battle by survival, then balloons.
   r.order.sort((a, b) => {
+    if (r.mode === 'battle') {
+      if (!!a.ghost !== !!b.ghost) return a.ghost ? 1 : -1;
+      if (a.ghost) return b.outAt - a.outAt;
+      return b.balloons - a.balloons;
+    }
     if (a.finished !== b.finished) return a.finished ? -1 : 1;
     if (a.finished) return a.finishTime - b.finishTime;
     return b.progress - a.progress;
@@ -624,6 +650,7 @@ function stepRace(dt) {
         if (ev === 'hit' || ev === 'bonk' || ev === 'zap') k.shake = ev === 'bonk' ? 0.25 : 0.6;
         if (k.player) sendTo(k.player.pid, { t: 'fx', k: ev });
       }
+      if (ev === 'hit' && r.mode === 'battle') popBalloon(k);
       if (ev === 'hit') {
         fx.burst(k.x, 1.5, k.z, [0xffe14d, 0xffffff], 14, 6, 1);
         if (!k.human) audio.sfx('bump');
@@ -669,8 +696,22 @@ function stepRace(dt) {
     if (r.phase === 'race') audio.setStar(anyStar);
   }
 
+  // End of battle: one kart left standing, every human out, or time up.
+  if (r.mode === 'battle' && r.phase === 'race') {
+    const humansIn = r.humanKarts.some((k) => !k.ghost);
+    if (r.endTimer < 0 && ((alive.length <= 1 && r.karts.length > 1) || !humansIn)) {
+      r.endTimer = 3;
+      const winner = alive.length === 1 ? alive[0] : null;
+      if (winner) for (const h of r.humanKarts) flash(h, h === winner ? 'YOU WIN!' : `${winner.name} WINS!`, '#ffe14d', 3);
+    }
+    if (r.clock >= BATTLE_TIME && r.endTimer < 0) r.endTimer = 0.01;
+    if (r.endTimer > 0) {
+      r.endTimer -= dt;
+      if (r.endTimer <= 0) showResults();
+    }
+  }
   // End of race.
-  if (r.phase === 'race') {
+  if (r.phase === 'race' && r.mode !== 'battle') {
     // Disconnected players' karts drive on autopilot, so a Wi-Fi blip doesn't end the race.
     const humansLeft = r.humanKarts.some((k) => !k.finished);
     if (!humansLeft && r.endTimer < 0) r.endTimer = 3.5;
@@ -687,6 +728,46 @@ function stepRace(dt) {
   if (r.statusTimer <= 0) {
     r.statusTimer = 0.15;
     for (const k of r.humanKarts) if (k.player?.connected) sendRaceState(k.player);
+  }
+}
+
+// Battle: a hit pops one balloon; at zero the kart is out and becomes a ghost.
+function popBalloon(k) {
+  const r = race;
+  if (k.ghost || !(k.balloons > 0)) return;
+  k.balloons--;
+  k.setBalloons(k.balloons);
+  fx.burst(k.x, 3.2, k.z, [new THREE.Color(k.driver.color).getHex(), 0xffffff], 22, 9, 0);
+  audio.sfx('pop');
+  if (k.stealer && !k.stealer.ghost) {
+    const thief = k.stealer;
+    thief.balloons = Math.min(5, thief.balloons + 1);
+    thief.setBalloons(thief.balloons);
+    if (thief.human) flash(thief, 'BALLOON STOLEN!', '#7dff6e', 1.4);
+  }
+  k.stealer = null;
+  if (k.balloons <= 0) {
+    k.outAt = r.clock + ++r.outCount * 1e-3;
+    k.item = null;
+    k.itemCount = 0;
+    k.roulette = 0;
+    k.setGhost();
+    if (k.human) flash(k, 'ELIMINATED', '#ff5a5a', 3);
+    audio.sfx('explode');
+  } else if (k.human) {
+    flash(k, `${k.balloons} 🎈 LEFT`, '#ffffff', 1.2);
+  }
+}
+
+// Battle: ramming a rival while boosting (mushroom/star) steals a balloon.
+function ramSteals(alive) {
+  for (const a of alive) {
+    if (a.boost <= 0 && a.star <= 0) continue;
+    for (const b of alive) {
+      if (a === b || b.star > 0) continue;
+      if ((a.x - b.x) ** 2 + (a.z - b.z) ** 2 > 2.9 * 2.9) continue;
+      if (b.hit('bump')) b.stealer = a;
+    }
   }
 }
 
@@ -761,6 +842,10 @@ function sendRaceState(p) {
     item: k.roulette > 0 ? 'roulette' : k.item,
     ic: k.itemCount,
     fin: k.finished,
+    mode: race.mode,
+    balloons: k.balloons ?? 0,
+    out: !!k.ghost,
+    left: race.mode === 'battle' ? Math.max(0, Math.ceil(BATTLE_TIME - race.clock)) : 0,
     captain: p.pid === captainPid(),
   });
 }
@@ -783,6 +868,7 @@ function showResults() {
       color: k.driver.color,
       human: k.human,
       time: k.finished ? k.finishTime : null,
+      balloons: r.mode === 'battle' ? (k.ghost ? 0 : k.balloons) : null,
       pts,
       total: k.player ? k.player.points : null,
     };
@@ -792,13 +878,16 @@ function showResults() {
   for (const row of rows) {
     const tr = document.createElement('tr');
     if (!row.human) tr.className = 'cpu';
-    const t = row.time == null ? '—' : `${Math.floor(row.time / 60)}:${(row.time % 60).toFixed(2).padStart(5, '0')}`;
+    const t = row.balloons != null
+      ? row.balloons > 0 ? '🎈'.repeat(row.balloons) : 'Out'
+      : row.time == null ? '—' : `${Math.floor(row.time / 60)}:${(row.time % 60).toFixed(2).padStart(5, '0')}`;
     tr.innerHTML = `<td>${ordinal(row.place)}</td><td><span class="sw"></span><span class="nm"></span></td><td>${t}</td><td>+${row.pts}</td><td>${row.total ?? ''}</td>`;
     tr.querySelector('.sw').style.background = row.color;
     tr.querySelector('.nm').textContent = row.name + (row.human ? '' : ' (CPU)');
     body.appendChild(tr);
   }
-  $('resultsTitle').textContent = `${TRACK_NAMES[cfg.track]} — Results`;
+  $('resultsTitle').textContent = r.mode === 'battle' ? `${TRACK_NAMES[cfg.track]} Arena — Balloon Battle` : `${TRACK_NAMES[cfg.track]} — Results`;
+  $('resultsTimeCol').textContent = r.mode === 'battle' ? 'Balloons' : 'Time';
   $('results').classList.remove('hidden');
   lastResults = { t: 'results', rows, captain: captainPid() };
   sendTo('*', lastResults);
@@ -859,6 +948,13 @@ function renderView(cam, r) {
 // Lobby: a slow fly-through along the track.
 function renderLobby(dt) {
   if (!track) return;
+  if (track.arena) {
+    lobbyS += dt * 0.12;
+    lobbyCam.position.set(Math.cos(lobbyS) * 95, 32, Math.sin(lobbyS) * 95);
+    lobbyCam.lookAt(0, 0, 0);
+    renderView(lobbyCam, { x: 0, y: 0, w: W, h: H });
+    return;
+  }
   const cl = track.cl;
   lobbyS = (lobbyS + (dt * 9) / cl.seg) % cl.n;
   const p = cl.pointAt(lobbyS, Math.sin(lobbyS / 60) * 6);

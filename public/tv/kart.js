@@ -364,6 +364,14 @@ export class Kart {
     this.x += this.vx * dt;
     this.z += this.vz * dt;
 
+    if (track.arena) {
+      // Battle arena: round wall + obstacles, no laps or off-road.
+      for (const h of track.arena.constrain(this, KART_RADIUS * 0.9)) this.bounce(h.nx, h.nz);
+      this.offroad = false;
+      this.wrongWay = 0;
+      return;
+    }
+
     // Track position, walls, off-road.
     const prevIdx = this.idx;
     let loc = cl.locate(this.x, this.z, this.idx);
@@ -401,6 +409,66 @@ export class Kart {
     this.wrongWay = dot < -0.35 && this.spin <= 0 ? this.wrongWay + dt : 0;
   }
 
+  // Collision response against a surface with outward normal (nx, nz).
+  bounce(nx, nz) {
+    const vn = this.vx * nx + this.vz * nz;
+    if (vn >= 0) return;
+    this.vx -= nx * vn * 1.3;
+    this.vz -= nz * vn * 1.3;
+    if (-vn > 6 && this.bonk <= 0) {
+      this.speed *= 0.75;
+      this.bonk = 0.4;
+      this.emit('bonk');
+    }
+  }
+
+  // Battle mode: a cluster of balloons tied behind the driver.
+  setBalloons(n) {
+    const m = this.model;
+    if (!m.balloons) {
+      m.balloons = new THREE.Group();
+      m.balloons.position.set(0, 2.1, -1.35);
+      m.body.add(m.balloons);
+    }
+    const g = m.balloons;
+    while (g.children.length > n) {
+      const b = g.children.pop();
+      g.remove(b);
+    }
+    const mat = (m.balloonMat ??= new THREE.MeshStandardMaterial({ color: this.driver.color, roughness: 0.2, metalness: 0.05, emissive: this.driver.color, emissiveIntensity: 0.15 }));
+    const geo = (Kart.balloonGeo ??= new THREE.SphereGeometry(0.45, 16, 12).scale(1, 1.2, 1));
+    const knot = (Kart.knotGeo ??= new THREE.ConeGeometry(0.12, 0.2, 6).rotateX(Math.PI));
+    const str = (Kart.stringGeo ??= new THREE.CylinderGeometry(0.015, 0.015, 1.4, 4).translate(0, -0.75, 0));
+    const strMat = (Kart.stringMat ??= new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    while (g.children.length < n) {
+      const k = g.children.length;
+      const b = new THREE.Group();
+      const ball = new THREE.Mesh(geo, mat);
+      b.add(ball);
+      const kn = new THREE.Mesh(knot, mat);
+      kn.position.y = -0.68;
+      b.add(kn);
+      b.add(new THREE.Mesh(str, strMat));
+      const a = (k / 5) * Math.PI * 2;
+      b.userData.base = new THREE.Vector3(Math.cos(a) * 0.55 * Math.min(1, k), 0.7 + (k % 2) * 0.3, Math.sin(a) * 0.4 * Math.min(1, k));
+      b.position.copy(b.userData.base);
+      b.userData.phase = Math.random() * 6;
+      g.add(b);
+    }
+  }
+
+  // Eliminated in battle: drives on as a see-through ghost (karts are rebuilt each race).
+  setGhost() {
+    this.ghost = true;
+    this.model.body.traverse((o) => {
+      if (!o.material) return;
+      o.material.transparent = true;
+      o.material.opacity = 0.3;
+      o.material.depthWrite = false;
+    });
+    this.model.shadow.visible = false;
+  }
+
   driftTier() {
     let t = -1;
     DRIFT_TIERS.forEach((d, i) => this.driftCharge >= d.at && (t = i));
@@ -430,6 +498,13 @@ export class Kart {
     for (const f of m.flames) {
       f.visible = this.boost > 0;
       if (f.visible) f.scale.set(1, 1, 0.6 + Math.random() * 0.8);
+    }
+    if (m.balloons) {
+      for (const b of m.balloons.children) {
+        const p = b.userData.phase;
+        b.position.set(b.userData.base.x + Math.sin(time * 2 + p) * 0.08, b.userData.base.y + Math.sin(time * 2.6 + p) * 0.1, b.userData.base.z - Math.min(0.5, Math.abs(this.speed) * 0.02));
+        b.rotation.x = -Math.min(0.5, Math.abs(this.speed) * 0.02);
+      }
     }
     if (this.star > 0) m.paint.color.setHSL((time * 2.5) % 1, 0.9, 0.55);
     else m.paint.color.set(this.driver.color);

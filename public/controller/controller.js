@@ -102,11 +102,16 @@ function refresh() {
   $('captainBox').classList.toggle('hidden', !captain);
   $('waitBox').classList.toggle('hidden', captain);
   const c = lobby.cfg;
-  $('cTrack').textContent = lobby.tracks[c.track];
-  $('cLaps').textContent = c.laps;
+  const battle = c.mode === 'battle';
+  $('cMode').textContent = battle ? '🎈 Balloons' : '🏁 Race';
+  $('cTrack').textContent = lobby.tracks[c.track] + (battle ? ' Arena' : '');
+  $('cLaps').textContent = battle ? '3 min' : c.laps;
+  $('cLaps').parentElement.querySelector('span').textContent = battle ? 'Time' : 'Laps';
   $('cCc').textContent = c.cc + 'cc';
   $('cBots').textContent = c.bots;
-  $('waitCfg').textContent = `${lobby.tracks[c.track]} · ${c.laps} laps · ${c.cc}cc · ${c.bots} CPU`;
+  $('waitCfg').textContent = battle
+    ? `🎈 Balloon Battle · ${lobby.tracks[c.track]} Arena · ${c.cc}cc · ${c.bots} CPU`
+    : `${lobby.tracks[c.track]} · ${c.laps} laps · ${c.cc}cc · ${c.bots} CPU`;
   $('quitBtn').classList.toggle('hidden', !captain);
 }
 
@@ -203,7 +208,12 @@ function onStatus(s) {
   }
   lastPhase = s.phase;
   $('rPlace').textContent = s.place ? ordinal(s.place) : '–';
-  $('rLap').textContent = `Lap ${s.lap}/${s.laps}`;
+  if (s.mode === 'battle') {
+    const m = Math.floor(s.left / 60), sec = String(s.left % 60).padStart(2, '0');
+    $('rLap').textContent = `${s.out ? 'OUT' : '🎈'.repeat(s.balloons)}  ${m}:${sec}`;
+  } else {
+    $('rLap').textContent = `Lap ${s.lap}/${s.laps}`;
+  }
   const cd = $('countdown');
   if (s.phase === 'countdown') {
     cd.classList.remove('hidden');
@@ -215,8 +225,9 @@ function onStatus(s) {
   $('itemIcon').textContent =
     s.item === 'roulette' ? '❓' : s.item ? ITEMS[s.item].icon + (s.item === 'triple' && s.ic > 1 ? `×${s.ic}` : '') : '';
   const fin = $('finishMsg');
-  fin.classList.toggle('hidden', !s.fin);
+  fin.classList.toggle('hidden', !s.fin && !s.out);
   if (s.fin) fin.innerHTML = `🏁 FINISHED<br>${ordinal(s.place)}`;
+  else if (s.out) fin.innerHTML = '💥 ELIMINATED<br><small>Keep driving as a ghost!</small>';
   if (lobby) lobby.captain = s.captain ? myPid : lobby.captain === myPid ? null : lobby.captain;
   $('quitBtn').classList.toggle('hidden', !s.captain);
 }
@@ -225,7 +236,7 @@ function vibrate(p) {
   if (opts.vibe && navigator.vibrate) navigator.vibrate(p);
 }
 function onFx(k) {
-  if (k === 'hit') vibrate([80, 40, 160]);
+  if (k === 'hit') vibrate([80, 40, 160, 40, 80]);
   else if (k === 'zap') vibrate([40, 30, 40, 30, 200]);
   else if (k === 'bump' || k === 'bonk') vibrate(40);
   else if (k === 'boost') vibrate(25);

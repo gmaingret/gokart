@@ -195,6 +195,11 @@ export function sfx(name, arg) {
       noise(t, 0.5, { vol: 0.5, type: 'lowpass', freq: 2500, to: 120 });
       osc('sine', 120, t, 0.35, { vol: 0.35, slide: -80 });
       break;
+    case 'pop':
+      noise(t, 0.06, { vol: 0.5, type: 'highpass', freq: 1500 });
+      osc('sine', 900, t, 0.08, { vol: 0.2, slide: -600 });
+      osc('triangle', 1400, t + 0.04, 0.12, { vol: 0.08, slide: 900 });
+      break;
     case 'bump':
       osc('sine', 130, t, 0.12, { vol: 0.35, slide: -70 });
       noise(t, 0.08, { vol: 0.2, type: 'lowpass', freq: 900 });

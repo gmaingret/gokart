@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addWind } from './wind.js';
 
 export const ROAD_HALF = 9; // drivable asphalt half-width (m)
 export const CURB = 1.4; // curb width beyond the asphalt
@@ -18,7 +19,7 @@ export const TRACKS = [
       fog: [0xbfe6ff, 220, 900], ground: 0x58b04a, ground2: 0x86c95a, offroad: 0x6fae45, groundTex: 'grass',
       road: '#4d5057', wallA: 0xf4f4f4, wallB: 0xe53935, curbA: 0xffffff, curbB: 0xe53935,
       banner: ['#e53935', '#ffffff', '#1e88e5', '#ffcf33'],
-      hemi: [0xdff1ff, 0x4a7a3a, 1.0], sun: [0xfff4e0, 2.4], deco: 'tree', mountains: 0x5f8f6a, snowcaps: true,
+      hemi: [0xdff1ff, 0x4a7a3a, 1.0], sun: [0xfff4e0, 2.4], deco: 'tree', mountains: 0x5f8f6a, snowcaps: true, grass: 0x7fcf55,
       hills: 22, weather: 'pollen', dust: 0x9a7a4a,
     },
     boxes: [0.16, 0.42, 0.7], pads: [0.3, 0.57, 0.88],
@@ -34,7 +35,7 @@ export const TRACKS = [
       fog: [0xffe2b0, 220, 950], ground: 0xe6c27c, ground2: 0xd4a862, offroad: 0xd9ad5f, groundTex: 'sand',
       road: '#6e6152', wallA: 0xffffff, wallB: 0x1e88e5, curbA: 0xffffff, curbB: 0x1e88e5,
       banner: ['#1e88e5', '#ffffff', '#ff8a1e', '#2bb673'],
-      hemi: [0xfff1d6, 0x9c7a4a, 1.05], sun: [0xffe9c4, 2.6], deco: 'cactus', mountains: 0xc98f4e,
+      hemi: [0xfff1d6, 0x9c7a4a, 1.05], sun: [0xffe9c4, 2.6], deco: 'cactus', mountains: 0xc98f4e, grass: 0xcab06a,
       hills: 16, weather: 'sand', dust: 0xe8c588,
     },
     boxes: [0.12, 0.37, 0.62, 0.86], pads: [0.24, 0.5, 0.78],
@@ -66,7 +67,7 @@ export const TRACKS = [
       fog: [0x1a0830, 140, 640], ground: 0x0e0822, ground2: 0x160c34, offroad: 0x1d1240, groundTex: 'grid',
       road: '#221c36', wallA: 0x00e5ff, wallB: 0xff2bd6, curbA: 0x00e5ff, curbB: 0xff2bd6,
       banner: ['#00e5ff', '#ff2bd6', '#7d4dff', '#ffe14d'],
-      hemi: [0x8a7dff, 0x200a40, 0.65], sun: [0xb3a6ff, 0.7], deco: 'pillar', mountains: 0x2a1a5a,
+      hemi: [0x8a7dff, 0x200a40, 0.65], sun: [0xb3a6ff, 0.7], deco: 'pillar', mountains: 0x2a1a5a, bloom: 0.8, bloomThreshold: 1.0,
       hills: 6, weather: 'motes', dust: 0x7d4dff, night: true, lamps: true, skyline: true,
     },
     boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.25, 0.52, 0.76],
@@ -82,7 +83,7 @@ export const TRACKS = [
       fog: [0xffe0bc, 200, 850], ground: 0x9c7a2f, ground2: 0xc4872f, offroad: 0xa8762c, groundTex: 'grass',
       road: '#4a4a4f', wallA: 0xffffff, wallB: 0xe67e22, curbA: 0xffffff, curbB: 0xe67e22,
       banner: ['#d35400', '#ffffff', '#7b3f00', '#f1c40f'],
-      hemi: [0xfff0d8, 0x6b4a2a, 1.0], sun: [0xffe2b0, 2.3], deco: 'autumn', mountains: 0x8a6a4a,
+      hemi: [0xfff0d8, 0x6b4a2a, 1.0], sun: [0xffe2b0, 2.3], deco: 'autumn', mountains: 0x8a6a4a, grass: 0xc9a040,
       hills: 26, weather: 'leaves', dust: 0x9a7a4a,
     },
     boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.27, 0.52, 0.78],
@@ -98,7 +99,7 @@ export const TRACKS = [
       fog: [0xc8f1ff, 240, 950], ground: 0xf2dca0, ground2: 0xe8cc88, offroad: 0xead39a, groundTex: 'sand',
       road: '#5b6068', wallA: 0xffffff, wallB: 0x00b4d8, curbA: 0xffffff, curbB: 0x00b4d8,
       banner: ['#00b4d8', '#ffffff', '#ff6b6b', '#ffd166'],
-      hemi: [0xffffff, 0xb59b6a, 1.1], sun: [0xfff6e0, 2.6], deco: 'beach', mountains: 0x5fa86a,
+      hemi: [0xffffff, 0xb59b6a, 1.1], sun: [0xfff6e0, 2.6], deco: 'beach', mountains: 0x5fa86a, grass: 0x9fcf5a,
       hills: -14, water: 0x1fa3c9, dust: 0xf2dca0,
     },
     boxes: [0.13, 0.38, 0.63, 0.87], pads: [0.25, 0.5, 0.75],
@@ -114,7 +115,7 @@ export const TRACKS = [
       fog: [0x3a120a, 140, 640], ground: 0x2a2224, ground2: 0x3a2a26, offroad: 0x3a2c28, groundTex: 'rock',
       road: '#2e2a2c', wallA: 0x1a1a1a, wallB: 0xff4d00, curbA: 0xff4d00, curbB: 0x1a1a1a,
       banner: ['#ff4d00', '#1a1a1a', '#ffb000', '#ffffff'],
-      hemi: [0xff9a6a, 0x2a0a05, 0.85], sun: [0xff8a50, 1.7], deco: 'lava', mountains: 0x3a1a14,
+      hemi: [0xff9a6a, 0x2a0a05, 0.85], sun: [0xff8a50, 1.7], deco: 'lava', mountains: 0x3a1a14, bloom: 0.8, bloomThreshold: 1.0,
       hills: 40, weather: 'embers', dust: 0x555555, glowCurbs: true,
     },
     boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.27, 0.53, 0.8],
@@ -130,7 +131,7 @@ export const TRACKS = [
       fog: [0xffe0f0, 200, 850], ground: 0xffb3d9, ground2: 0xffd1e8, offroad: 0xffc4e1, groundTex: 'grass',
       road: '#5a3a2a', wallA: 0xffffff, wallB: 0xff6fb5, curbA: 0xffffff, curbB: 0xff6fb5,
       banner: ['#ff6fb5', '#ffffff', '#7fdbff', '#b784ff'],
-      hemi: [0xffffff, 0xd08ab0, 1.15], sun: [0xfff0f8, 2.2], deco: 'candy', mountains: 0xffc4e1, snowcaps: true,
+      hemi: [0xffffff, 0xd08ab0, 1.15], sun: [0xfff0f8, 2.2], deco: 'candy', mountains: 0xffc4e1, snowcaps: true, grass: 0xff9ccf,
       hills: 18, weather: 'sprinkles', dust: 0xffd1e8,
     },
     boxes: [0.14, 0.39, 0.64, 0.88], pads: [0.26, 0.51, 0.77],
@@ -146,7 +147,7 @@ export const TRACKS = [
       fog: [0xcfe8c8, 120, 600], ground: 0x2f7a2f, ground2: 0x4f9a3a, offroad: 0x5a7a2a, groundTex: 'grass',
       road: '#5a4a3a', wallA: 0x8d6e63, wallB: 0x2e7d32, curbA: 0xffcf33, curbB: 0x2e7d32,
       banner: ['#2e7d32', '#ffcf33', '#8d6e63', '#ffffff'],
-      hemi: [0xe8ffe0, 0x2a4a1a, 1.0], sun: [0xfff6d0, 2.0], deco: 'jungle', mountains: 0x3f6f3f,
+      hemi: [0xe8ffe0, 0x2a4a1a, 1.0], sun: [0xfff6d0, 2.0], deco: 'jungle', mountains: 0x3f6f3f, grass: 0x4faf3a,
       hills: 30, weather: 'pollen', dust: 0x6a5a3a,
     },
     boxes: [0.13, 0.38, 0.63, 0.87], pads: [0.25, 0.5, 0.76],
@@ -162,7 +163,7 @@ export const TRACKS = [
       fog: [0x0d0828, 160, 700], ground: 0x0b0a20, ground2: 0x14123a, offroad: 0x1a1640, groundTex: 'grid',
       road: '#1a1a3a', wallA: 0x7d4dff, wallB: 0x00e5ff, curbA: 0x7d4dff, curbB: 0x00e5ff,
       banner: ['#7d4dff', '#00e5ff', '#ff2bd6', '#ffffff'],
-      hemi: [0x9a8aff, 0x100830, 0.7], sun: [0xb3a6ff, 0.7], deco: 'crystal', mountains: 0x2a1f6a,
+      hemi: [0x9a8aff, 0x100830, 0.7], sun: [0xb3a6ff, 0.7], deco: 'crystal', mountains: 0x2a1f6a, bloom: 0.8, bloomThreshold: 1.0,
       hills: 20, weather: 'motes', dust: 0x7d4dff, night: true, lamps: true, rainbowRoad: true,
     },
     boxes: [0.15, 0.4, 0.65, 0.88], pads: [0.25, 0.52, 0.76],
@@ -538,13 +539,109 @@ export function instanced(geo, mat, transforms) {
 }
 
 // Sea around low-lying tracks (terrain dips below it away from the road).
+function waterNormals() {
+  const N = 128;
+  const h = new Float32Array(N * N);
+  const r = rng(42);
+  // A few overlapping sine ripples tile seamlessly.
+  const waves = Array.from({ length: 6 }, () => [1 + Math.floor(r() * 4), 1 + Math.floor(r() * 4), r() * 6.28]);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      let v = 0;
+      for (const [a, b, p] of waves) v += Math.sin(((x * a + y * b) / N) * Math.PI * 2 + p);
+      h[y * N + x] = v;
+    }
+  return canvasTexture(N, N, (g) => {
+    const img = g.createImageData(N, N);
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        const dx = h[y * N + ((x + 1) % N)] - h[y * N + ((x - 1 + N) % N)];
+        const dy = h[((y + 1) % N) * N + x] - h[((y - 1 + N) % N) * N + x];
+        const i = (y * N + x) * 4;
+        img.data[i] = 128 + dx * 18;
+        img.data[i + 1] = 128 + dy * 18;
+        img.data[i + 2] = 255;
+        img.data[i + 3] = 255;
+      }
+    g.putImageData(img, 0, 0);
+  });
+}
+
 export function waterPlane(theme, cx, cz) {
+  const nm = waterNormals();
+  nm.colorSpace = THREE.NoColorSpace;
+  nm.repeat.set(120, 120);
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(3000, 3000).rotateX(-Math.PI / 2),
-    new THREE.MeshLambertMaterial({ color: theme.water, emissive: theme.water, emissiveIntensity: 0.25, transparent: true, opacity: 0.88 })
+    new THREE.MeshStandardMaterial({ color: theme.water, roughness: 0.12, metalness: 0.35, normalMap: nm, normalScale: new THREE.Vector2(0.6, 0.6), transparent: true, opacity: 0.9 })
   );
   m.position.set(cx, -1.4, cz);
+  m.userData.water = nm;
   return m;
+}
+
+// Shared finishing touches for a track or arena group: shadow flags, plus an
+// animator for water ripples and glowing lava.
+export function finishGroup(group) {
+  const waters = [], lavas = [];
+  group.traverse((o) => {
+    if (!o.isMesh) return;
+    if (o.userData.water) waters.push(o.userData.water);
+    if (o.material?.userData?.lava) lavas.push(o.material);
+    if (o.isInstancedMesh) o.castShadow = !o.userData.noShadow;
+    else if (o.userData.cast) o.castShadow = true;
+    if (!o.isInstancedMesh) o.receiveShadow = true;
+  });
+  const base = lavas.map((m) => m.color.clone());
+  return (time) => {
+    for (const w of waters) {
+      w.offset.x = (time * 0.012) % 1;
+      w.offset.y = (time * 0.008) % 1;
+    }
+    lavas.forEach((m, i) => m.color.copy(base[i]).multiplyScalar(1 + 0.35 * Math.sin(time * 2.2 + i)));
+  };
+}
+
+// Grass tufts along both run-off strips.
+function grassTufts(cl, theme, group, seed) {
+  if (!theme.grass) return;
+  const r = rng(seed + 77);
+  const list = [];
+  const inner = ROAD_HALF + CURB + 0.4, outer = WALL - 0.7;
+  for (let i = 0; i < cl.n; i++) {
+    for (let k = 0; k < 3; k++) {
+      const side = r() < 0.5 ? -1 : 1;
+      const lat = side * (inner + r() * (outer - inner));
+      const f = r();
+      const j = (i + 1) % cl.n;
+      const x = cl.px[i] + (cl.px[j] - cl.px[i]) * f + cl.nx[i] * lat;
+      const z = cl.pz[i] + (cl.pz[j] - cl.pz[i]) * f + cl.nz[i] * lat;
+      list.push([x, 0, z, 0.6 + r() * 0.8, r() * 6.28]);
+    }
+  }
+  const parts = [];
+  for (let b = 0; b < 4; b++) {
+    const a = (b / 4) * Math.PI * 2;
+    parts.push(new THREE.ConeGeometry(0.07, 0.8, 3).translate(Math.cos(a) * 0.15, 0.4, Math.sin(a) * 0.15).rotateZ(Math.cos(a) * 0.25));
+  }
+  const geo = mergeGeos(parts);
+  const mesh = instanced(geo, addWind(new THREE.MeshLambertMaterial({ color: theme.grass }), 0.12), list);
+  mesh.userData.noShadow = true;
+  group.add(mesh);
+}
+
+function mergeGeos(list) {
+  const pos = [], norm = [];
+  for (const g of list) {
+    const ng = g.index ? g.toNonIndexed() : g;
+    ng.computeVertexNormals();
+    pos.push(...ng.attributes.position.array);
+    norm.push(...ng.attributes.normal.array);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+  return out;
 }
 
 // ---------------------------------------------------------------- scenery
@@ -573,7 +670,7 @@ export function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
   const lam = (color, extra = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
   const flat = (color) => lam(color, { flatShading: true });
   const split = (k) => spots.filter((_, i) => i % 3 === k);
-  const add = (geo, mat, list) => group.add(instanced(geo, mat, list));
+  const add = (geo, mat, list) => group.add(instanced(geo, addWind(mat), list));
   const A = split(0), B = split(1), C = split(2);
 
   switch (theme.deco) {
@@ -656,8 +753,13 @@ export function scenery(cl, theme, group, seed, heightAt, distAt, avoid) {
     }
     case 'lava': {
       add(new THREE.DodecahedronGeometry(2.4, 0).scale(1.2, 0.9, 1).translate(0, 1, 0), flat(0x2b2326), A);
-      add(new THREE.CircleGeometry(3.5, 14).rotateX(-Math.PI / 2).translate(0, 0.15, 0), new THREE.MeshBasicMaterial({ color: 0xff5a00 }), B);
-      add(new THREE.CircleGeometry(2.2, 14).rotateX(-Math.PI / 2).translate(0.4, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0xffc040 }), B);
+      const lava = (c) => {
+        const m = new THREE.MeshBasicMaterial({ color: c });
+        m.userData.lava = true;
+        return m;
+      };
+      add(new THREE.CircleGeometry(3.5, 14).rotateX(-Math.PI / 2).translate(0, 0.15, 0), lava(0xff5a00), B);
+      add(new THREE.CircleGeometry(2.2, 14).rotateX(-Math.PI / 2).translate(0.4, 0.2, 0.2), lava(0xffc040), B);
       add(new THREE.ConeGeometry(1.1, 6, 5).translate(0, 3, 0), flat(0x3a1f3a), C);
       add(new THREE.ConeGeometry(0.7, 3.6, 5).translate(1.4, 1.8, 0.6), flat(0x4a2a4a), C);
       break;
@@ -1019,6 +1121,7 @@ export function buildTrack(index) {
   };
 
   const glowTex = glowTexture();
+  grassTufts(cl, theme, group, seed);
   const gs = grandstandSpot(cl);
   scenery(cl, theme, group, seed, heightAt, distAt, [[gs.x, gs.z, 32]]);
   trackside(cl, theme, group, seed, glowTex);
@@ -1078,7 +1181,10 @@ export function buildTrack(index) {
   }
 
   const arches = group.children.filter((o) => o.userData.pulse !== undefined);
+  gantry.traverse((o) => (o.userData.cast = true));
+  const animate = finishGroup(group);
   const update = (time, excitement = 0) => {
+    animate(time);
     padTex.offset.y = -(time * 1.5) % 1;
     crowdUpdate(time, excitement);
     for (const a of arches) {

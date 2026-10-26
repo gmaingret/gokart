@@ -18,6 +18,8 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
   whoever has the most balloons after 3 minutes
 - Hilly themed worlds with scenery, grandstand crowds, neon city skyline at night, sky with clouds and weather
 - Particle effects: drift sparks, tyre smoke, dust, boost flames, item explosions, confetti
+- Bloom + colour grading, real-time shadows, tyre marks, grass and wind-blown trees,
+  shimmering water, glowing lava and kart head/brake lights (all switched off by **Graphics: Low**)
 - Synthesized sound: engines with gear shifts, tyre screech, layered effects and an original soundtrack
   per track (speeds up on the final lap, switches to a star theme with star power)
 - Phones vibrate when you get hit, grab an item or boost (Android)
@@ -100,7 +102,7 @@ so on a plain-http home network use slide steering there.
 ## TV / keyboard controls
 
 - TV remote in the lobby: ▲▼ choose a setting, ◀▶ change it, OK starts the race; OK on the results screen continues.
-- **Graphics: Low** in the lobby setup trades effects and resolution for speed — use it if the TV browser stutters.
+- **Graphics: Low** in the lobby setup turns off bloom, shadows, reflections and tyre marks and lowers resolution — use it if the TV browser stutters.
 - **K** adds a keyboard racer (arrows/WASD, Space to drift, X to use an item) — handy for testing without phones.
 - **Esc** ends the current race.
 

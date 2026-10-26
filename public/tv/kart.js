@@ -172,6 +172,22 @@ function buildModel(driver, name) {
   b.add('visor', new THREE.SphereGeometry(0.36, 16, 10, -Math.PI / 2.6, Math.PI / 1.3, Math.PI / 2.9, Math.PI / 3.6), 0, 1.78, -0.32);
 
   body.add(b.mesh('paint', paint), b.mesh('trim', trim), b.mesh('chrome', chrome), b.mesh('visor', visorMat));
+  // Headlights: bright enough to bloom, which really shows at night.
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff4c8 });
+  lampMat.color.multiplyScalar(4);
+  for (const sx of [-0.45, 0.45]) {
+    const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.13, 12), lampMat);
+    lamp.position.set(sx, 0.55, 2.07);
+    body.add(lamp);
+  }
+  // Brake lights (lit when braking, see updateModel).
+  const brakeMat = new THREE.MeshBasicMaterial({ color: 0x551010 });
+  for (const sx of [-0.3, 0.3]) {
+    const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.12), brakeMat);
+    tail.position.set(sx, 0.95, -1.49);
+    tail.rotation.y = Math.PI;
+    body.add(tail);
+  }
   // number plate on the nose (textured, so it stays its own mesh)
   const plate = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), new THREE.MeshStandardMaterial({ map: plateTexture(name[0]?.toUpperCase() || '?', driver.color), roughness: 0.5 }));
   plate.position.set(0, 0.82, 1.15);
@@ -218,7 +234,10 @@ function buildModel(driver, name) {
   const tag = nameTag(name, driver.color);
   root.add(tag);
 
-  return { root, body, wheels, flames, exhausts, tag, paint, shadow };
+  body.traverse((o) => {
+    if (o.isMesh && o.material !== flameMat) o.castShadow = true;
+  });
+  return { root, body, wheels, flames, exhausts, tag, paint, shadow, brakeMat };
 }
 
 export class Kart {
@@ -499,6 +518,7 @@ export class Kart {
       f.visible = this.boost > 0;
       if (f.visible) f.scale.set(1, 1, 0.6 + Math.random() * 0.8);
     }
+    if (m.brakeMat) m.brakeMat.color.setHex(this.input.brake ? 0xff2020 : 0x551010).multiplyScalar(this.input.brake ? 4 : 1);
     if (m.balloons) {
       for (const b of m.balloons.children) {
         const p = b.userData.phase;

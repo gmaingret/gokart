@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   TRACKS, WALL, rng, fbm, smooth, canvasTexture, groundTexture, roadTexture, bannerTexture,
-  glowTexture, instanced, scenery, grandstandAt, waterPlane,
+  glowTexture, instanced, scenery, grandstandAt, waterPlane, finishGroup,
 } from './track.js';
 
 // Balloon-battle arena: a round, walled bowl with pillars and crates to hide
@@ -280,7 +280,11 @@ export function buildArena(index) {
   scenery({ n: ringN, px, pz }, theme, group, seed, heightAt, (x, z) => Math.max(distAt(x, z), 0), avoid);
 
   const bobbers = group.children.filter((o) => o.userData.bob);
+  // Obstacles and the mascot balloon cast shadows onto the floor.
+  for (const o of group.children) if (o.isMesh && !o.isInstancedMesh && o !== floor && o !== kerb && o !== wall && o.geometry.type !== 'PlaneGeometry') o.userData.cast = true;
+  const animate = finishGroup(group);
   const update = (time, excitement = 0) => {
+    animate(time);
     for (const u of crowdUpdates) u(time, excitement);
     for (const b of bobbers) b.position.y = 15.5 + Math.sin(time * 1.3) * 0.6;
   };

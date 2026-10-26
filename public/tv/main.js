@@ -6,6 +6,9 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Kart, collideKarts, DRIFT_TIERS, setLowQuality } from './kart.js';
 import { FX } from './fx.js';
 import { Sky } from './sky.js';
+import { Post } from './post.js';
+import { Skids } from './skids.js';
+import { wind } from './wind.js';
 import { Items } from './items.js';
 import { driveBot, botSpeedMult, driveBattle } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
@@ -55,18 +58,37 @@ scene.environmentIntensity = 0.7;
 const hemi = new THREE.HemisphereLight(0xffffff, 0x446644, 1);
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(120, 200, 60);
-scene.add(hemi, sun);
+// Real-time shadows in a box that follows whichever camera is rendering.
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -48, right: 48, top: 48, bottom: -48, near: 1, far: 420 });
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.04;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+scene.add(hemi, sun, sun.target);
+const sunDir = new THREE.Vector3(0.5, 0.45, 0.3).normalize();
 const sky = new Sky(scene);
 const fx = new FX(scene);
+const post = new Post(renderer);
+const skids = new Skids(scene);
+const high = () => cfg.gfx !== 'low';
 const lobbyCam = new THREE.PerspectiveCamera(55, 1, 0.5, 1500);
 
 function applyGfx() {
   const dpr = window.devicePixelRatio || 1;
   renderer.setPixelRatio(cfg.gfx === 'low' ? Math.min(dpr, 1) * 0.75 : Math.min(dpr, 1.5));
   fx.density = cfg.gfx === 'low' ? 0.35 : 1;
-  // Low: no reflections and plain kart materials (applies from the next race).
+  // Low: no reflections, shadows, bloom or tyre marks, and plain kart materials (from the next race).
   scene.environment = cfg.gfx === 'low' ? null : envMap;
   setLowQuality(cfg.gfx === 'low');
+  const shadows = high();
+  if (renderer.shadowMap.enabled !== shadows) {
+    renderer.shadowMap.enabled = shadows;
+    sun.castShadow = shadows;
+    scene.traverse((o) => {
+      if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true;
+    });
+  }
+  post.setSize(W || 1, H || 1, renderer.getPixelRatio());
   if (W) renderer.setSize(W, H, false);
 }
 
@@ -75,6 +97,7 @@ function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
   renderer.setSize(W, H, false);
+  post.setSize(W, H, renderer.getPixelRatio());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   hudCanvas.width = W * dpr;
   hudCanvas.height = H * dpr;
@@ -118,7 +141,9 @@ function loadTrack(i) {
   scene.background = new THREE.Color(t.fog[0]);
   scene.fog = new THREE.Fog(t.fog[0], t.fog[1], t.fog[2]);
   const sd = t.sky.sunDir ?? [0.5, 0.45, 0.3];
-  sun.position.set(sd[0] * 300, sd[1] * 300, sd[2] * 300);
+  sunDir.set(sd[0], Math.max(0.25, sd[1]), sd[2]).normalize();
+  post.setTheme(t);
+  skids.clear();
   fx.clear();
   lobbyS = 0;
   hemi.color.setHex(t.hemi[0]);
@@ -477,6 +502,7 @@ function startRace() {
     homingT: 0,
   };
   fx.clear();
+  skids.clear();
   track.setStartLights(0);
   for (const [k, cam] of humanKarts.map((k, i) => [k, cams[i]])) snapCamera(cam, k);
   phase = 'countdown';
@@ -787,6 +813,17 @@ function emitKartFx(k, dt) {
   const fwdX = k.forwardX, fwdZ = k.forwardZ;
   const sc = k.shrink > 0 ? 0.6 : 1;
   const speed = Math.abs(k.speed);
+  // Tyre marks while drifting, braking hard or spinning out.
+  if (high() && !race.track.arena?.noSkids && (k.drifting || k.spin > 0 || (k.input.brake && speed > 12)) && speed > 5) {
+    k.skidT = (k.skidT || 0) - dt;
+    if (k.skidT <= 0) {
+      k.skidT = 0.035;
+      for (const sx of [-1.05, 1.05]) {
+        const p = k.toWorld(sx * sc, 0, -0.95 * sc);
+        skids.add(p.x, p.z, Math.atan2(k.vx, k.vz), race.time);
+      }
+    }
+  }
   if (k.drifting && speed > 6) {
     const tier = k.driftTier();
     const color = tier >= 0 ? DRIFT_TIERS[tier].color : 0xfff2b0;
@@ -941,14 +978,35 @@ function updateCamera(cam, k, dt, r) {
   cam.updateProjectionMatrix();
 }
 
+// Point rendering at one screen rectangle, either on the HDR post target or
+// straight on screen (Low graphics). three.js viewport origin is bottom-left.
+function setRect(r) {
+  if (high()) {
+    const t = post.target, pr = renderer.getPixelRatio();
+    t.viewport.set(r.x * pr, (H - r.y - r.h) * pr, r.w * pr, r.h * pr);
+    t.scissor.copy(t.viewport);
+    t.scissorTest = true;
+    renderer.setRenderTarget(t);
+  } else {
+    renderer.setRenderTarget(null);
+    renderer.setViewport(r.x, H - r.y - r.h, r.w, r.h);
+    renderer.setScissor(r.x, H - r.y - r.h, r.w, r.h);
+  }
+}
+
+const camDir = new THREE.Vector3();
 function renderView(cam, r) {
-  // three.js viewport origin is bottom-left.
-  renderer.setViewport(r.x, H - r.y - r.h, r.w, r.h);
-  renderer.setScissor(r.x, H - r.y - r.h, r.w, r.h);
   cam.aspect = r.w / r.h;
   cam.updateProjectionMatrix();
   sky.follow(cam);
   fx.setViewport(cam, r.h);
+  // Shadow box centred a little ahead of this camera.
+  cam.getWorldDirection(camDir);
+  const tx = cam.position.x + camDir.x * 30, tz = cam.position.z + camDir.z * 30;
+  sun.target.position.set(tx, 0, tz);
+  sun.position.set(tx + sunDir.x * 160, sunDir.y * 160, tz + sunDir.z * 160);
+  sun.target.updateMatrixWorld();
+  setRect(r);
   renderer.render(scene, cam);
 }
 
@@ -975,6 +1033,16 @@ function renderLobby(dt) {
 const overviewCam = new THREE.PerspectiveCamera(60, 1, 0.5, 1500);
 let orbit = 0;
 function render(dt) {
+  wind.value = performance.now() / 1000;
+  skids.update(race ? race.time : 0);
+  const views = race && race.phase !== 'results' ? race.humanKarts.length : 0;
+  const cells = layout(Math.max(1, views), W, H);
+  post.setViews(Math.round(W / cells[0].w), Math.round(H / cells[0].h));
+  drawFrame(dt);
+  if (high()) post.finish();
+}
+
+function drawFrame(dt) {
   hud.clearRect(0, 0, W, H);
   sky.update(dt);
   fx.update(dt);
@@ -1010,7 +1078,7 @@ function render(dt) {
   // Spare cell (3, 5, 7 players) shows the map + standings; otherwise a corner minimap.
   if (rects.length > views.length) {
     const spare = rects[views.length];
-    renderer.setScissor(spare.x, H - spare.y - spare.h, spare.w, spare.h);
+    setRect(spare);
     renderer.setClearColor(0x10132e);
     renderer.clear();
     drawMinimap(hud, { x: spare.x, y: spare.y, w: spare.w * 0.6, h: spare.h }, r.track, r.karts);

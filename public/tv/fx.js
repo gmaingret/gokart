@@ -15,7 +15,8 @@ varying float vShape;
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = aSize * uScale / max(0.1, -mv.z);
+  // Cap on-screen size so a particle drifting right past the camera doesn't fill the view.
+  gl_PointSize = min(aSize * uScale / max(0.1, -mv.z), 90.0);
   vAlpha = aAlpha;
   vColor = aColor;
   vShape = aShape;
@@ -195,7 +196,7 @@ export class FX {
   // Ambient weather around a point (each human camera).
   ambient(dt, x, z, kind) {
     if (!kind) return;
-    const rate = kind === 'snow' ? 90 : 25;
+    const rate = kind === 'snow' ? 90 : kind === 'leaves' || kind === 'sprinkles' ? 40 : 25;
     const r = rate * dt * this.density;
     const n = Math.floor(r) + (Math.random() < r % 1 ? 1 : 0);
     for (let i = 0; i < n; i++) {
@@ -207,6 +208,14 @@ export class FX {
         this.spawn(true, px, 0.5 + Math.random() * 8, pz, { color: c, vy: 0.5, spread: 0.6, drag: 0.2, life: 3.5, s0: 0.5, s1: 0.2, a: 0.8 });
       } else if (kind === 'sand') {
         this.spawn(false, px, 0.3 + Math.random() * 2, pz, { color: 0xf0d39a, vx: 6, vy: 0.2, spread: 1.5, drag: 0.3, life: 2.5, s0: 0.6, s1: 1.4, a: 0.25 });
+      } else if (kind === 'leaves') {
+        const c = [0xe67e22, 0xc0392b, 0xf1c40f, 0xb5651d][Math.floor(Math.random() * 4)];
+        this.spawn(false, px, 8 + Math.random() * 8, pz, { color: c, vy: -1.6, vx: 1.2, spread: 2, drag: 0.4, life: 6, s0: 0.5, s1: 0.45, a: 0.95, shape: 2 });
+      } else if (kind === 'embers') {
+        this.spawn(true, px, 0.3 + Math.random() * 2, pz, { color: Math.random() < 0.5 ? 0xff5a00 : 0xffb040, vy: 2.5, spread: 1.2, drag: 0.3, life: 3, s0: 0.35, s1: 0.05, a: 1 });
+      } else if (kind === 'sprinkles') {
+        const c = [0xff6fb5, 0x7fdbff, 0xffe14d, 0x7dff6e, 0xb784ff][Math.floor(Math.random() * 5)];
+        this.spawn(false, px, 10 + Math.random() * 6, pz, { color: c, vy: -3, spread: 0.6, drag: 0.2, life: 5, s0: 0.18, s1: 0.18, a: 1 });
       } else if (kind === 'pollen') {
         this.spawn(true, px, 1 + Math.random() * 6, pz, { color: 0xfff6b0, vy: 0.2, spread: 0.5, drag: 0.3, life: 4, s0: 0.25, s1: 0.2, a: 0.6 });
       }

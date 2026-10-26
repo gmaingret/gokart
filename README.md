@@ -6,7 +6,8 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - Up to **8 racers**: friends on phones plus CPU drivers to fill the grid
 - **Split screen** for every human player (1 → full screen, 2 → top/bottom, 3–4 → 2×2, up to 4×2),
   with a live minimap and standings
-- **4 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night
+- **10 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night, Autumn Woods, Beach Bay,
+  Lava Castle, Candy Land, Jungle Ruins and Cosmic Way (each also has its own battle arena)
 - **Drifting with mini-turbos** (blue → orange → pink sparks), boost pads, rocket starts
 - **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
   mushroom, triple mushroom, star and lightning

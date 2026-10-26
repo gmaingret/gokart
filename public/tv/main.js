@@ -635,7 +635,14 @@ function stepRace(dt) {
     if (a.finished) return a.finishTime - b.finishTime;
     return b.progress - a.progress;
   });
-  r.order.forEach((k, i) => (k.place = i + 1));
+  if (r.mode === 'battle') {
+    // Ties share a place: rank = 1 + rivals still in with more balloons.
+    r.order.forEach((k, i) => {
+      k.place = k.ghost ? i + 1 : 1 + alive.filter((o) => o.balloons > k.balloons).length;
+    });
+  } else {
+    r.order.forEach((k, i) => (k.place = i + 1));
+  }
 
   // Events -> sound + phone vibration.
   for (const k of r.karts) {

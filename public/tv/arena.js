@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   TRACKS, WALL, rng, fbm, smooth, canvasTexture, groundTexture, roadTexture, bannerTexture,
-  glowTexture, instanced, scenery, grandstandAt,
+  glowTexture, instanced, scenery, grandstandAt, waterPlane,
 } from './track.js';
 
 // Balloon-battle arena: a round, walled bowl with pillars and crates to hide
@@ -164,7 +164,7 @@ export function buildArena(index) {
     const h = heightAt(x, z);
     tp.setY(i, h);
     c.copy(g1).lerp(g2, fbm(x / 40, z / 40, seed + 9, 3));
-    if (theme.snowcaps && h > hills * 0.75) c.lerp(white, Math.min(1, (h - hills * 0.75) / 6));
+    if (theme.snowcaps && hills > 0 && h > hills * 0.75) c.lerp(white, Math.min(1, (h - hills * 0.75) / 6));
     tcol[i * 3] = c.r; tcol[i * 3 + 1] = c.g; tcol[i * 3 + 2] = c.b;
   }
   tGeo.setAttribute('color', new THREE.BufferAttribute(tcol, 3));
@@ -175,6 +175,7 @@ export function buildArena(index) {
     ? new THREE.MeshLambertMaterial({ vertexColors: true, emissiveMap: gTex, emissive: 0xffffff, map: gTex })
     : new THREE.MeshLambertMaterial({ vertexColors: true, map: gTex });
   group.add(new THREE.Mesh(tGeo, terrainMat));
+  if (theme.water) group.add(waterPlane(theme, 0, 0));
 
   // Arena floor with painted rings, plus a striped kerb around the edge.
   const floor = new THREE.Mesh(new THREE.CircleGeometry(R + 0.5, 72).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: floorTexture(theme) }));

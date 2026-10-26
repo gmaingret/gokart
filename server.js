@@ -18,6 +18,7 @@ const PORT = Number(process.env.PORT) || 8080;
 const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const THREE_DIR = path.join(__dirname, 'node_modules', 'three', 'build');
+const THREE_ADDONS_DIR = path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -98,6 +99,10 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (p.startsWith('/vendor/three-addons/')) {
+    const f = safeJoin(THREE_ADDONS_DIR, p.slice('/vendor/three-addons/'.length));
+    return f ? sendFile(res, f) : (res.writeHead(403), res.end());
+  }
   if (p.startsWith('/vendor/three/')) {
     const f = safeJoin(THREE_DIR, p.slice('/vendor/three/'.length));
     return f ? sendFile(res, f) : (res.writeHead(403), res.end());

@@ -7,7 +7,7 @@
   <link rel="icon" href="/shared/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/tv/tv.css">
   <script type="importmap">
-    { "imports": { "three": "/vendor/three/three.module.js" } }
+    { "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three-addons/" } }
   </script>
 </head>
 <body>
@@ -36,6 +36,7 @@
         <div class="row" data-k="laps"><span>Laps</span><button class="dec">◀</button><b id="vLaps"></b><button class="inc">▶</button></div>
         <div class="row" data-k="cc"><span>Speed</span><button class="dec">◀</button><b id="vCc"></b><button class="inc">▶</button></div>
         <div class="row" data-k="bots"><span>CPU racers</span><button class="dec">◀</button><b id="vBots"></b><button class="inc">▶</button></div>
+        <div class="row" data-k="gfx"><span>Graphics</span><button class="dec">◀</button><b id="vGfx"></b><button class="inc">▶</button></div>
         <div class="row start" data-k="start"><button id="startBtn">Start race</button></div>
         <p class="hint">TV remote: ▲▼ choose · ◀▶ change · OK start<br>Keyboard: press <kbd>K</kbd> to add a keyboard racer (arrows, Space drift, X item)</p>
       </div>

@@ -251,52 +251,59 @@ function brass(m, t, dur, vol) {
 // ---------------------------------------------------------------- engines
 const engines = new Map();
 
+// A soft, rounded "electric go-kart" hum: triangle + sine voices through a gentle
+// low-pass, with a slow tremolo for texture. No distortion, so it stays easy on
+// the ears over a whole race.
 function makeEngine() {
   const out = ctx.createGain();
   out.gain.value = 0;
   const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-  const shaper = ctx.createWaveShaper();
-  const curve = new Float32Array(256);
-  for (let i = 0; i < 256; i++) {
-    const x = (i / 255) * 2 - 1;
-    curve[i] = Math.tanh(x * 2.5);
-  }
-  shaper.curve = curve;
   const lp = ctx.createBiquadFilter();
   lp.type = 'lowpass';
-  lp.Q.value = 2;
+  lp.Q.value = 0.7;
   const mix = ctx.createGain();
-  mix.gain.value = 0.35;
-  mix.connect(shaper).connect(lp).connect(out).connect(pan).connect(engineBus);
+  mix.gain.value = 0.5;
+  mix.connect(lp).connect(out).connect(pan).connect(engineBus);
 
-  const o1 = ctx.createOscillator(); o1.type = 'sawtooth';
-  const o2 = ctx.createOscillator(); o2.type = 'square';
-  const o3 = ctx.createOscillator(); o3.type = 'sawtooth'; o3.detune.value = 14;
-  const g2 = ctx.createGain(); g2.gain.value = 0.6;
-  o1.connect(mix); o2.connect(g2).connect(mix); o3.connect(mix);
-  // Firing pulse: amplitude modulation at the "cylinder" rate.
-  const am = ctx.createOscillator(); am.type = 'square';
-  const amDepth = ctx.createGain(); amDepth.gain.value = 0.18;
-  am.connect(amDepth).connect(mix.gain);
-  for (const o of [o1, o2, o3, am]) o.start();
+  const voice = (type, gain, detune = 0) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.detune.value = detune;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    o.connect(g).connect(mix);
+    return o;
+  };
+  const o1 = voice('triangle', 0.6); // main tone
+  const o2 = voice('sine', 0.7); // body, an octave down
+  const o3 = voice('triangle', 0.25, 7); // slight chorus
+  const o4 = voice('sine', 0.08); // airy overtone
+  // Gentle tremolo gives a soft "purr" instead of a buzz.
+  const trem = ctx.createOscillator();
+  trem.type = 'sine';
+  const tremDepth = ctx.createGain();
+  tremDepth.gain.value = 0.1;
+  trem.connect(tremDepth).connect(mix.gain);
+  for (const o of [o1, o2, o3, o4, trem]) o.start();
 
-  // Tyre screech (drift) and off-road rumble.
+  // Tyre squeal (drift), off-road rumble and wind, all kept soft.
   const nz = ctx.createBufferSource(); nz.buffer = noiseBuf; nz.loop = true;
-  const screechF = ctx.createBiquadFilter(); screechF.type = 'bandpass'; screechF.frequency.value = 1900; screechF.Q.value = 5;
+  const screechF = ctx.createBiquadFilter(); screechF.type = 'bandpass'; screechF.frequency.value = 1300; screechF.Q.value = 1.5;
+  const screechLp = ctx.createBiquadFilter(); screechLp.type = 'lowpass'; screechLp.frequency.value = 2800;
   const screech = ctx.createGain(); screech.gain.value = 0;
-  const wob = ctx.createOscillator(); wob.frequency.value = 9;
-  const wobD = ctx.createGain(); wobD.gain.value = 260;
+  const wob = ctx.createOscillator(); wob.frequency.value = 5;
+  const wobD = ctx.createGain(); wobD.gain.value = 150;
   wob.connect(wobD).connect(screechF.frequency);
-  nz.connect(screechF).connect(screech).connect(pan);
-  const rumbleF = ctx.createBiquadFilter(); rumbleF.type = 'lowpass'; rumbleF.frequency.value = 220;
+  nz.connect(screechF).connect(screechLp).connect(screech).connect(pan);
+  const rumbleF = ctx.createBiquadFilter(); rumbleF.type = 'lowpass'; rumbleF.frequency.value = 160;
   const rumble = ctx.createGain(); rumble.gain.value = 0;
   nz.connect(rumbleF).connect(rumble).connect(pan);
-  const windF = ctx.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 700; windF.Q.value = 0.6;
+  const windF = ctx.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 600; windF.Q.value = 0.5;
   const wind = ctx.createGain(); wind.gain.value = 0;
   nz.connect(windF).connect(wind).connect(pan);
   nz.start();
   wob.start();
-  return { out, pan, lp, o1, o2, o3, am, screech, rumble, wind, nodes: [o1, o2, o3, am, nz, wob], gear: 0 };
+  return { out, pan, lp, o1, o2, o3, o4, trem, screech, rumble, wind, nodes: [o1, o2, o3, o4, trem, nz, wob] };
 }
 
 // state: {speed, max, gas, boost, drifting, offroad, pan, on, scale}
@@ -306,26 +313,28 @@ export function updateEngine(id, s) {
   if (!e) engines.set(id, (e = makeEngine()));
   const t = now();
   const sp = Math.max(0, s.speed) / s.max;
-  // Five-gear box: pitch climbs through each gear and drops on the shift.
-  const gears = [0, 0.2, 0.42, 0.64, 0.86, 1.6];
+  // Three soft "gears": the pitch rises through each and eases back on the shift.
+  const gears = [0, 0.3, 0.65, 1.6];
   let g = 0;
-  while (g < 4 && sp > gears[g + 1]) g++;
+  while (g < 2 && sp > gears[g + 1]) g++;
   const frac = Math.min(1, (sp - gears[g]) / (gears[g + 1] - gears[g]));
-  let rpm = 0.3 + frac * 0.7 + g * 0.05;
-  if (sp < 0.03) rpm = 0.22 + Math.sin(t * 7) * 0.01;
-  if (s.boost) rpm *= 1.18;
-  const f = 42 + rpm * 95;
-  const tc = 0.04;
+  let rpm = 0.35 + frac * 0.5 + g * 0.08;
+  if (sp < 0.03) rpm = 0.3;
+  if (s.boost) rpm *= 1.12;
+  const f = 90 + rpm * 120;
+  const tc = 0.09;
   e.o1.frequency.setTargetAtTime(f, t, tc);
   e.o2.frequency.setTargetAtTime(f / 2, t, tc);
-  e.o3.frequency.setTargetAtTime(f * 1.005, t, tc);
-  e.am.frequency.setTargetAtTime(f / 2, t, tc);
-  e.lp.frequency.setTargetAtTime(s.gas ? 500 + rpm * 1800 : 300 + rpm * 500, t, 0.06);
-  const vol = s.on ? (s.gas ? 0.5 : 0.28) * (s.scale ?? 1) : 0;
-  e.out.gain.setTargetAtTime(vol, t, 0.08);
-  e.screech.gain.setTargetAtTime(s.on && s.drifting && sp > 0.3 ? 0.07 * (s.scale ?? 1) : 0, t, 0.05);
-  e.rumble.gain.setTargetAtTime(s.on && s.offroad && sp > 0.05 ? 0.35 * (s.scale ?? 1) : 0, t, 0.08);
-  e.wind.gain.setTargetAtTime(s.on ? Math.max(0, sp - 0.5) * 0.12 * (s.scale ?? 1) : 0, t, 0.2);
+  e.o3.frequency.setTargetAtTime(f, t, tc);
+  e.o4.frequency.setTargetAtTime(f * 3, t, tc);
+  e.trem.frequency.setTargetAtTime(6 + rpm * 10, t, tc);
+  e.lp.frequency.setTargetAtTime(s.gas ? 450 + rpm * 700 : 300 + rpm * 300, t, 0.12);
+  const sc = s.scale ?? 1;
+  const vol = s.on ? (s.gas ? 0.3 : 0.18) * sc : 0;
+  e.out.gain.setTargetAtTime(vol, t, 0.12);
+  e.screech.gain.setTargetAtTime(s.on && s.drifting && sp > 0.3 ? 0.035 * sc : 0, t, 0.08);
+  e.rumble.gain.setTargetAtTime(s.on && s.offroad && sp > 0.05 ? 0.25 * sc : 0, t, 0.1);
+  e.wind.gain.setTargetAtTime(s.on ? Math.max(0, sp - 0.6) * 0.06 * sc : 0, t, 0.3);
   if (e.pan.pan) e.pan.pan.setTargetAtTime(s.pan ?? 0, t, 0.1);
 }
 

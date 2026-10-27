@@ -7,13 +7,18 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - **Split screen** for every human player (1 → full screen, 2 → top/bottom, 3–4 → 2×2, up to 4×2),
   with a live minimap and standings
 - **10 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night, Autumn Woods, Beach Bay,
-  Lava Castle, Candy Land, Jungle Ruins and Cosmic Way (each also has its own battle arena)
+  Lava Castle, Candy Land, Jungle Ruins and Cosmic Way (each also has its own battle arena).
+  Each one has its own layout: hills and climbs, narrow and wide sections, jump ramps (press
+  DRIFT just after take-off for a trick and a boost on landing), dirt-path shortcuts on six
+  tracks, a figure-8 with a bridge on Cosmic Way, and track hazards: rolling barrels, boulders,
+  snowballs and tumbleweeds, lava geysers that launch you, neon/gumdrop bumpers and beach crabs
 - **Drifting with mini-turbos** (blue → orange → pink sparks), boost pads, rocket starts
 - **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
   mushroom, triple mushroom, star and lightning
 - 50cc / 100cc / 150cc, 1–7 laps, cup points that carry across races
-- **Balloon Battle** mode: everyone starts with 3 balloons in a walled arena (themed like the
-  selected track). Each shell, banana or star hit pops one; ram a rival while boosting to steal
+- **Balloon Battle** mode: everyone starts with 3 balloons in a walled arena themed like the
+  selected track, in one of five shapes: round bowl, square, ring around an island, cross, or a
+  pyramid with a raised centre platform reached by ramps (and you can drive off its edge). Each shell, banana or star hit pops one; ram a rival while boosting to steal
   one. Out of balloons = eliminated (you keep driving as a ghost). Last one standing wins, or
   whoever has the most balloons after 3 minutes
 - Hilly themed worlds with scenery, grandstand crowds, neon city skyline at night, sky with clouds and weather
@@ -137,7 +142,16 @@ npm test          # relay + track geometry tests
 
 All tracks are generated from a handful of control points in `public/tv/track.js`. Add a
 new entry to `TRACKS` (and its name to `TRACK_NAMES` in `public/shared/config.js`); the tests
-check that the new layout never overlaps itself.
+check that the new layout never overlaps itself. Optional per-track fields:
+
+| Field | Meaning |
+| --- | --- |
+| `elev: [[frac, metres], ...]` | road height along the lap (smoothly interpolated) |
+| `width: [[frac, halfWidth], ...]` | road half-width along the lap (6.5–12 m) |
+| `jumps: [frac, ...]` | kicker ramps |
+| `bridge: [fracA, fracB]` | stretch drawn as a bridge deck (for crossings) |
+| `shortcut: [fracA, fracB]` | open both barriers where these two stretches pass close by |
+| `hazards: [[kind, frac], ...]` | `barrel`, `boulder`, `snowball`, `tumbleweed`, `geyser`, `orb`, `gumdrop`, `crab` |
 
 ## Troubleshooting
 

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ROAD_HALF, CURB, WALL } from './track.js';
+import { CURB } from './track.js';
 
 export const KART_RADIUS = 1.3;
+const GRAVITY = 30;
 export const DRIFT_TIERS = [
   { at: 0.9, boost: 0.6, color: 0x3fa9ff },
   { at: 2.0, boost: 1.0, color: 0xff9a1f },
@@ -253,6 +254,8 @@ export class Kart {
 
   reset(spot) {
     this.x = spot.x; this.z = spot.z;
+    this.y = spot.y ?? 0; this.vy = 0; this.groundY = this.y; this.groundPrev = this.y;
+    this.air = false; this.airTime = 0; this.trick = 0;
     this.heading = spot.heading;
     this.vx = 0; this.vz = 0;
     this.speed = 0;
@@ -324,8 +327,20 @@ export class Kart {
     if (this.finished) top *= 0.6;
 
     this.steer += ((inp.steer || 0) - this.steer) * Math.min(1, dt * 12);
+    const driftEdge = inp.drift && !this.driftPrev;
 
-    if (this.spin > 0) {
+    if (this.air) {
+      // Airborne: no traction. A drift press right after take-off is a trick,
+      // paid out as a boost on landing.
+      this.airTime += dt;
+      if (driftEdge && this.airTime < 0.45 && !this.trick && this.spin <= 0) {
+        this.trick = 1;
+        this.emit('trickstart');
+      }
+      if (this.trick) this.trick += dt;
+      this.heading -= this.steer * 0.6 * dt;
+      if (this.spin > 0) this.spin -= dt;
+    } else if (this.spin > 0) {
       this.spin -= dt;
       this.spinAngle += dt * 14;
       this.speed *= Math.exp(-2.5 * dt);
@@ -347,8 +362,7 @@ export class Kart {
       if (this.speed > top) this.speed -= (this.speed - top) * Math.min(1, 2.5 * dt);
 
       // Drifting (hop + mini-turbo charge).
-      const driftPressed = inp.drift && !this.driftPrev;
-      if (driftPressed && this.hop <= 0 && !this.drifting) this.hop = 0.28;
+      if (driftEdge && this.hop <= 0 && !this.drifting) this.hop = 0.28;
       if (!this.drifting && inp.drift && Math.abs(this.steer) > 0.35 && this.speed > 11) {
         this.drifting = true;
         this.driftDir = Math.sign(this.steer);
@@ -384,18 +398,42 @@ export class Kart {
     this.z += this.vz * dt;
 
     if (track.arena) {
-      // Battle arena: round wall + obstacles, no laps or off-road.
+      // Battle arena: walls + obstacles, no laps or off-road.
       for (const h of track.arena.constrain(this, KART_RADIUS * 0.9)) this.bounce(h.nx, h.nz);
       this.offroad = false;
       this.wrongWay = 0;
+      this.stepVertical(dt, track.arena.groundAt(this.x, this.z, this.y));
       return;
     }
 
-    // Track position, walls, off-road.
+    // Track position, walls (with shortcut openings), off-road.
     const prevIdx = this.idx;
-    let loc = cl.locate(this.x, this.z, this.idx);
-    const limit = WALL - KART_RADIUS * 0.8;
-    if (Math.abs(loc.lateral) > limit) {
+    let loc = cl.locate(this.x, this.z, this.idx, this.y);
+    const wasOut = Math.abs(this.lateral) > cl.wall[loc.i];
+    if (wasOut && cl.shortcut) {
+      // On the shortcut path: keep between its two side edges.
+      for (const e of cl.shortcut.edges) {
+        const dx = this.x - e.ax, dz = this.z - e.az;
+        const t = (dx * e.ux + dz * e.uz) / e.len;
+        const d = dx * e.nx + dz * e.nz;
+        const r = KART_RADIUS * 0.8;
+        if (t < -0.1 || t > 1.1 || d >= r || d < -6) continue;
+        this.x += e.nx * (r - d);
+        this.z += e.nz * (r - d);
+        this.bounce(e.nx, e.nz);
+      }
+      loc = cl.locate(this.x, this.z, this.idx, this.y);
+    }
+    const limit = cl.wall[loc.i] - KART_RADIUS * 0.8;
+    const open = cl.gap[loc.i] === Math.sign(loc.lateral);
+    if (wasOut && !open && Math.abs(loc.lateral) < cl.wall[loc.i] + KART_RADIUS * 0.8) {
+      // Outside the barrier (on the path) next to a closed stretch: keep out.
+      const s = Math.sign(loc.lateral), over = cl.wall[loc.i] + KART_RADIUS * 0.8 - Math.abs(loc.lateral);
+      this.x += cl.nx[loc.i] * over * s;
+      this.z += cl.nz[loc.i] * over * s;
+      this.bounce(cl.nx[loc.i] * s, cl.nz[loc.i] * s);
+      loc = cl.locate(this.x, this.z, this.idx, this.y);
+    } else if (!wasOut && Math.abs(loc.lateral) > limit && !open) {
       const i = loc.i;
       const nx = cl.nx[i], nz = cl.nz[i];
       const over = Math.abs(loc.lateral) - limit;
@@ -412,12 +450,15 @@ export class Kart {
           this.emit('bonk');
         }
       }
-      loc = cl.locate(this.x, this.z, this.idx);
+      loc = cl.locate(this.x, this.z, this.idx, this.y);
     }
     this.idx = loc.idx;
     this.f = loc.f;
     this.lateral = loc.lateral;
-    this.offroad = Math.abs(loc.lateral) > ROAD_HALF + CURB + 0.4;
+    // Past an opened barrier is the shortcut's packed-dirt path: no off-road drag.
+    const cut = Math.abs(loc.lateral) > cl.wall[loc.i];
+    this.offroad = !cut && Math.abs(loc.lateral) > cl.hw[loc.i] + CURB + 0.4;
+    this.stepVertical(dt, cl.groundAt(loc));
 
     const d = this.idx - prevIdx;
     if (d < -cl.n / 2) this.lap++;
@@ -426,6 +467,36 @@ export class Kart {
 
     const dot = this.forwardX * cl.tx[this.idx] + this.forwardZ * cl.tz[this.idx];
     this.wrongWay = dot < -0.35 && this.spin <= 0 ? this.wrongWay + dt : 0;
+  }
+
+  // Gravity, take-off, landing and slopes. `ground` is the surface height here.
+  stepVertical(dt, ground) {
+    const prev = this.groundPrev;
+    this.vy -= GRAVITY * dt;
+    this.y += this.vy * dt;
+    if (this.y <= ground) {
+      if (this.air && this.airTime > 0.2) {
+        this.emit('land');
+        if (this.trick && this.spin <= 0) {
+          this.giveBoost(0.8);
+          this.emit('trick');
+        }
+      }
+      this.y = ground;
+      // Follow the surface: climbing gives upward speed that carries you off crests.
+      this.vy = Math.max(-25, Math.min(9, (ground - prev) / dt));
+      // Gravity along the slope.
+      const moved = Math.max(0.05, Math.hypot(this.vx, this.vz) * dt);
+      const slope = Math.max(-0.6, Math.min(0.6, (ground - prev) / moved));
+      if (!this.air) this.speed -= 9 * slope * dt * Math.sign(this.speed || 1);
+      this.air = false;
+      this.airTime = 0;
+      this.trick = 0;
+    } else if (this.y > ground + 0.12) {
+      this.air = true;
+    }
+    this.groundPrev = ground;
+    this.groundY = ground;
   }
 
   // Collision response against a surface with outward normal (nx, nz).
@@ -496,14 +567,21 @@ export class Kart {
 
   updateModel(dt, time = 0) {
     const m = this.model;
-    m.root.position.set(this.x, 0, this.z);
+    m.root.position.set(this.x, this.y, this.z);
+    m.root.rotation.order = 'YXZ';
     m.root.rotation.y = this.heading;
+    // Pitch with the climb/fall.
+    const pitch = Math.max(-0.4, Math.min(0.4, Math.atan2(this.vy, Math.max(4, Math.abs(this.speed)))));
+    m.root.rotation.x += (-pitch - m.root.rotation.x) * Math.min(1, dt * 10);
+    m.shadow.position.y = this.groundY - this.y + 0.08;
     const hopY = this.hop > 0 ? Math.sin((this.hop / 0.28) * Math.PI) * 0.5 : 0;
     // Engine rumble + bumpy suspension.
     const rumble = Math.sin(time * 38 + this.x) * 0.012 * (this.offroad ? 4 : 1) * Math.min(1, Math.abs(this.speed) / 5 + 0.3);
     m.body.position.y = hopY + rumble;
     m.body.rotation.y = (this.drifting ? this.driftDir * -0.38 : 0) + this.spinAngle;
     m.body.rotation.z = this.drifting ? this.driftDir * 0.07 : -this.steer * 0.05 * Math.min(1, Math.abs(this.speed) / 10);
+    // Trick: a quick barrel roll in the air.
+    if (this.trick) m.body.rotation.z = Math.min(1, this.trick / 0.4) * Math.PI * 2;
     // Squat under acceleration / boost.
     m.body.rotation.x = this.boost > 0 ? -0.05 : 0;
     const sc = this.shrink > 0 ? 0.6 : 1;
@@ -535,7 +613,7 @@ export class Kart {
   // World position of a point given in the kart's local frame.
   toWorld(lx, ly, lz) {
     const c = Math.cos(this.heading), s = Math.sin(this.heading);
-    return { x: this.x + lx * c + lz * s, y: ly, z: this.z - lx * s + lz * c };
+    return { x: this.x + lx * c + lz * s, y: this.y + ly, z: this.z - lx * s + lz * c };
   }
 }
 
@@ -545,6 +623,7 @@ export function collideKarts(karts) {
   for (let a = 0; a < karts.length; a++) {
     for (let b = a + 1; b < karts.length; b++) {
       const A = karts[a], B = karts[b];
+      if (Math.abs(A.y - B.y) > 2) continue;
       const dx = B.x - A.x, dz = B.z - A.z;
       const ra = A.shrink > 0 ? 0.6 : 1, rb = B.shrink > 0 ? 0.6 : 1;
       const min = KART_RADIUS * (ra + rb);

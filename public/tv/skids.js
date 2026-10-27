@@ -26,8 +26,8 @@ export class Skids {
     this.up = new THREE.Vector3(0, 1, 0);
   }
 
-  add(x, z, heading, time) {
-    const mark = { x, z, heading, born: time };
+  add(x, z, heading, time, y = 0) {
+    const mark = { x, y, z, heading, born: time };
     if (this.marks.length < POOL) this.marks.push(mark);
     else {
       this.marks[this.next] = mark;
@@ -42,7 +42,7 @@ export class Skids {
       if (age > LIFE || age < 0) continue;
       const k = 1 - age / LIFE;
       this.q.setFromAxisAngle(this.up, mk.heading);
-      this.m.compose(this.p.set(mk.x, 0.065, mk.z), this.q, this.s.set(k, 1, 1));
+      this.m.compose(this.p.set(mk.x, mk.y + 0.065, mk.z), this.q, this.s.set(k, 1, 1));
       this.mesh.setMatrixAt(n++, this.m);
     }
     this.mesh.count = n;

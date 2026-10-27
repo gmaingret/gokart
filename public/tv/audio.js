@@ -73,7 +73,7 @@ function env(g, t, a, peak, d, sustain, rel, end) {
   g.gain.exponentialRampToValueAtTime(0.0001, end + rel);
 }
 
-function osc(type, freq, t, dur, { vol = 0.3, slide = 0, slideTime, attack = 0.005, decay = 0.08, sustain = 0.6, release = 0.08, dest = sfxBus, detune = 0, filter } = {}) {
+function osc(type, freq, t, dur, { vol = 0.3, slide = 0, slideTime, attack = 0.005, decay = 0.08, sustain = 0.6, release = 0.08, dest = sfxBus, detune = 0, filter, vib } = {}) {
   const o = ctx.createOscillator();
   o.type = type;
   o.frequency.setValueAtTime(freq, t);
@@ -93,6 +93,17 @@ function osc(type, freq, t, dur, { vol = 0.3, slide = 0, slideTime, attack = 0.0
   node.connect(g).connect(dest);
   o.start(t);
   o.stop(t + dur + release + 0.05);
+  if (vib) {
+    // Vibrato: [rate Hz, depth cents], fading in after the attack.
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = vib[0];
+    const depth = ctx.createGain();
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.linearRampToValueAtTime(vib[1], t + Math.min(0.25, dur));
+    lfo.connect(depth).connect(o.detune);
+    lfo.start(t);
+    lfo.stop(t + dur + release + 0.05);
+  }
   return o;
 }
 
@@ -361,32 +372,57 @@ const SCALES = {
   minor: [0, 2, 3, 5, 7, 8, 10],
   dorian: [0, 2, 3, 5, 7, 9, 10],
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
   hijaz: [0, 1, 4, 5, 7, 8, 10],
+  minpent: [0, 3, 5, 7, 10],
 };
 
+// Each circuit has its own style: tempo, metre, groove and instruments.
+//   meter: steps per bar, div: steps per beat, swing: delay of odd steps (fraction of a step)
+//   drums: DRUMS pattern, bass: bass line style + bassInst, chords: accompaniment style
+//   arp: { pat, inst, vol, oct }, lead: { inst, style: pop | busy | long, vol }
 const SONGS = {
-  0: { bpm: 142, root: 60, scale: 'major', prog: [0, 4, 5, 3, 0, 4, 3, 4], seed: 11, lead: 'square', drums: 'pop', arp: 'up' },
-  1: { bpm: 128, root: 62, scale: 'hijaz', prog: [0, 0, 6, 0, 3, 3, 1, 0], seed: 23, lead: 'sawtooth', drums: 'tribal', arp: 'updown' },
-  2: { bpm: 134, root: 64, scale: 'major', prog: [0, 3, 5, 4, 0, 3, 1, 4], seed: 37, lead: 'triangle', drums: 'pop', arp: 'bell' },
-  3: { bpm: 122, root: 57, scale: 'minor', prog: [0, 5, 2, 6, 0, 5, 3, 4], seed: 53, lead: 'sawtooth', drums: 'synth', arp: 'eighths' },
-  4: { bpm: 118, root: 62, scale: 'dorian', prog: [0, 3, 4, 3, 0, 5, 3, 4], seed: 101, lead: 'triangle', drums: 'pop', arp: 'updown' },
-  5: { bpm: 136, root: 65, scale: 'mixolydian', prog: [0, 3, 6, 3, 0, 4, 3, 0], seed: 113, lead: 'square', drums: 'tribal', arp: 'up' },
-  6: { bpm: 150, root: 52, scale: 'minor', prog: [0, 5, 6, 4, 0, 5, 3, 4], seed: 127, lead: 'sawtooth', drums: 'synth', arp: 'eighths' },
-  7: { bpm: 144, root: 67, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 1, 4], seed: 139, lead: 'square', drums: 'pop', arp: 'bell' },
-  8: { bpm: 126, root: 57, scale: 'dorian', prog: [0, 0, 6, 0, 3, 3, 4, 0], seed: 151, lead: 'triangle', drums: 'tribal', arp: 'updown' },
-  9: { bpm: 132, root: 61, scale: 'minor', prog: [0, 5, 3, 6, 0, 5, 3, 4], seed: 163, lead: 'sawtooth', drums: 'four', arp: 'fast' },
-  lobby: { bpm: 96, root: 65, scale: 'major', prog: [0, 5, 3, 4, 0, 5, 1, 4], seed: 71, lead: null, drums: 'soft', arp: 'up' },
-  results: { bpm: 118, root: 60, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 4, 4], seed: 89, lead: 'square', drums: 'pop', arp: 'up' },
-  star: { bpm: 172, root: 67, scale: 'major', prog: [0, 0, 3, 4], seed: 97, lead: 'square', drums: 'four', arp: 'fast' },
+  // Sunny Circuit: bright pop-rock with strummed guitar.
+  0: { bpm: 142, root: 60, scale: 'major', prog: [0, 4, 5, 3, 0, 4, 3, 4], seed: 11, drums: 'pop', bass: 'bounce', chords: 'strum', arp: { pat: 'eighths', inst: 'triangle', vol: 0.7 }, lead: { inst: 'square', style: 'pop' } },
+  // Dune Dash: desert groove, darbuka and an oud-like plucked melody over a drone.
+  1: { bpm: 108, root: 62, scale: 'hijaz', prog: [0, 0, 6, 0, 3, 3, 1, 0], seed: 23, drums: 'darbuka', bass: 'drone', bassInst: 'sine', chords: 'pad', arp: null, lead: { inst: 'pluck', style: 'busy', vol: 1.2 } },
+  // Frosty Peaks: a waltz with sleigh bells and a celesta.
+  2: { bpm: 168, meter: 12, root: 64, scale: 'major', prog: [0, 3, 4, 0, 5, 1, 4, 0], seed: 37, drums: 'waltz', bass: 'tuba', bassInst: 'sine', chords: 'waltz', arp: null, lead: { inst: 'bell', style: 'pop' } },
+  // Neon Night: synthwave, gated snare, octave bass and a vibrato saw lead.
+  3: { bpm: 100, root: 57, scale: 'minor', prog: [0, 5, 2, 6], seed: 53, drums: 'synthwave', bass: 'octave8', bassInst: 'synth', chords: 'pad', arp: { pat: 'up', inst: 'sawtooth', vol: 0.5 }, lead: { inst: 'synthlead', style: 'long' } },
+  // Autumn Woods: Celtic jig in 12/8, flute and bodhrán.
+  4: { bpm: 116, meter: 12, div: 3, root: 62, scale: 'dorian', prog: [0, 0, 6, 6, 0, 0, 4, 0], seed: 101, drums: 'jig', bass: 'jig', bassInst: 'sine', chords: 'strum', arp: null, lead: { inst: 'flute', style: 'busy' } },
+  // Beach Bay: laid-back reggae with off-beat skank and steel drums.
+  5: { bpm: 98, root: 65, scale: 'mixolydian', prog: [0, 3, 4, 3], seed: 113, swing: 0.15, drums: 'reggae', bass: 'reggae', bassInst: 'sine', chords: 'stab', arp: null, lead: { inst: 'steel', style: 'pop' } },
+  // Lava Castle: metal, double kick, distorted power chords and lead.
+  6: { bpm: 168, root: 52, scale: 'phrygian', prog: [0, 0, 1, 0, 5, 5, 6, 4], seed: 127, drums: 'metal', bass: 'chug', bassInst: 'dist', chords: 'power', arp: null, lead: { inst: 'distlead', style: 'long' } },
+  // Candy Land: bouncy chiptune.
+  7: { bpm: 156, root: 67, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 1, 4], seed: 139, drums: 'chip', bass: 'octave8', bassInst: 'square', chords: 'none', arp: { pat: 'fast', inst: 'chip', vol: 0.45 }, lead: { inst: 'chip', style: 'busy' } },
+  // Jungle Ruins: tribal toms, marimba and pan flute.
+  8: { bpm: 116, root: 57, scale: 'minpent', prog: [0, 0, 3, 0, 2, 3, 0, 0], seed: 151, drums: 'jungle', bass: 'drone', bassInst: 'sine', chords: 'none', arp: { pat: 'updown', inst: 'marimba', vol: 1.3 }, lead: { inst: 'panflute', style: 'long' } },
+  // Cosmic Way: trance, rolling off-beat bass and supersaws.
+  9: { bpm: 138, root: 61, scale: 'minor', prog: [0, 5, 3, 6], seed: 163, drums: 'trance', bass: 'offbeat', bassInst: 'synth', chords: 'gated', arp: { pat: 'fast', inst: 'sawtooth', vol: 0.3, oct: 2 }, lead: { inst: 'supersaw', style: 'long' } },
+  lobby: { bpm: 96, root: 65, scale: 'major', prog: [0, 5, 3, 4, 0, 5, 1, 4], seed: 71, drums: 'soft', bass: 'bounce', chords: 'pad', arp: { pat: 'up', inst: 'triangle', vol: 1.4 }, lead: null },
+  results: { bpm: 118, root: 60, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 4, 4], seed: 89, drums: 'pop', bass: 'bounce', chords: 'pad', arp: { pat: 'up', inst: 'triangle' }, lead: { inst: 'square', style: 'pop' } },
+  star: { bpm: 172, root: 67, scale: 'major', prog: [0, 0, 3, 4], seed: 97, drums: 'four', bass: 'bounce', chords: 'pad', arp: { pat: 'fast', inst: 'triangle' }, lead: { inst: 'square', style: 'pop' } },
 };
 
 const DRUMS = {
-  // 16 steps: k = kick, s = snare, h = closed hat, o = open hat
+  // One token per step ('' = rest, '+' joins hits):
+  // k kick, q light kick (double bass), s snare, S big snare, C clap, h closed hat, o open hat, t low tom, T high tom,
+  // d doum, x tek, g shaker, j sleigh bells, r rim, K kick + rim
   pop: ['k', 'h', 'h', 'h', 's', 'h', 'k', 'h', 'k', 'h', 'h', 'h', 's', 'h', 'h', 'o'],
-  tribal: ['k', 'h', 't', 'h', 's', 'h', 't', 'k', 'k', 'h', 't', 'h', 's', 't', 't', 'h'],
-  synth: ['k', '', 'h', '', 's', '', 'h', 'k', '', 'k', 'h', '', 's', '', 'o', ''],
   soft: ['k', '', '', '', '', '', 'h', '', 'k', '', '', '', '', '', 'h', ''],
   four: ['k', 'h', 'o', 'h', 'k', 'h', 'o', 'h', 'k', 'h', 'o', 'h', 'k', 'h', 'o', 'h'],
+  darbuka: ['d', '', 'x', 'g', '', 'g', 'x', '', 'd', 'g', '', 'g', 'x', '', 'x', 'g'],
+  waltz: ['k+j', 'j', 'j', 'j', 's+j', 'j', 'j', 'j', 's+j', 'j', 'j', 'j'],
+  synthwave: ['k', '', 'h', '', 'k+S', '', 'h', '', 'k', '', 'h', '', 'k+S', '', 'h', 'o'],
+  jig: ['d', 'h', 'h', 't', 'h', 'h', 'd', 'h', 'h', 's', 'h', 't'],
+  reggae: ['', 'h', '', 'h', '', 'h', '', 'h', 'K', 'h', '', 'h', '', 'h', 'r', 'h'],
+  metal: ['k+h', 'q', 'q+h', 'q', 'S+k+h', 'q', 'q+h', 'q', 'k+h', 'q', 'q+h', 'q', 'S+k+h', 'q', 'q+h', 'q'],
+  chip: ['k', '', 'h', '', 's', '', 'h', 'h', 'k', 'k', 'h', '', 's', '', 'h', 's'],
+  jungle: ['k+g', 'g', 't', 'g', 'T', 'g', 't', 't', 'k+g', 'g', 't', 'g', 'T', 't', 'T', 'g'],
+  trance: ['k', '', 'o', '', 'k+C', '', 'o', '', 'k', '', 'o', '', 'k+C', '', 'o', 'h'],
 };
 
 function seeded(seed) {
@@ -394,23 +430,38 @@ function seeded(seed) {
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-// Melody built from a two-bar rhythm/contour phrase applied over each chord,
-// arranged A A' B A so it sounds like a tune rather than random notes.
+// Melody built from a two-bar phrase over the chords, arranged A A' B A so it
+// sounds like a tune rather than random notes. Strong beats land on chord
+// tones; in between the line moves mostly by step.
 function composeLead(song) {
   const r = seeded(song.seed);
+  const meter = song.meter ?? 16, div = song.div ?? 4;
+  const style = song.lead.style ?? 'pop';
+  const grid = style === 'busy' ? 1 : style === 'long' ? div : 2;
+  const pick = (a) => a[Math.floor(r() * a.length)];
   const phrase = () => {
     const out = [];
-    for (let step = 0; step < 32; step += 2) {
-      const strong = step % 8 === 0;
-      if (!strong && r() < 0.28) continue;
-      const deg = strong ? [0, 2, 4][Math.floor(r() * 3)] : [1, 2, 3, 4, 5, -1][Math.floor(r() * 6)];
-      const len = r() < 0.25 ? 4 : 2;
-      out.push({ step, deg, len, oct: r() < 0.15 ? 1 : 0 });
+    let deg = 0;
+    for (let step = 0; step < meter * 2; step += grid) {
+      const strong = step % div === 0;
+      const rest = style === 'busy' ? 0.1 : style === 'long' ? 0.15 : 0.28;
+      if (step % meter !== 0 && !strong && r() < rest) continue;
+      if (style === 'long' && step % meter !== 0 && r() < rest) continue;
+      if (strong) {
+        const near = [0, 2, 4, 7].filter((c) => Math.abs(c - deg) <= 3);
+        deg = pick(near.length ? near : [0, 2, 4]);
+      } else {
+        deg = Math.max(-2, Math.min(8, deg + pick([-1, 1, -1, 1, 2, -2])));
+      }
+      let len = style === 'busy' ? (r() < 0.15 ? 2 : 1) : style === 'long' ? div * (r() < 0.45 ? 2 : 1) : r() < 0.25 ? 4 : 2;
+      len = Math.min(len, meter * 2 - step);
+      out.push({ step, deg, len, oct: r() < 0.12 ? 1 : 0 });
+      if (style === 'long') step += len - grid;
     }
     return out;
   };
   const A = phrase(), B = phrase();
-  const A2 = A.map((n, i) => (i === A.length - 1 ? { ...n, deg: 0, len: 4 } : n));
+  const A2 = A.map((n, i) => (i === A.length - 1 ? { ...n, deg: 0 } : n));
   return [A, A2, B, A];
 }
 
@@ -418,83 +469,284 @@ const music = { timer: null, song: null, step: 0, next: 0, lead: null, tempoMul:
 
 function scaleNote(song, degree, octave = 0) {
   const sc = SCALES[song.scale];
-  const o = Math.floor(degree / 7);
-  const d = ((degree % 7) + 7) % 7;
+  const o = Math.floor(degree / sc.length);
+  const d = ((degree % sc.length) + sc.length) % sc.length;
   return song.root + sc[d] + 12 * (o + octave);
 }
 
+// Soft-clipping bus for the metal guitars, created on first use.
+let distBus = null;
+function getDist() {
+  if (!distBus) {
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) curve[i] = Math.tanh(((i / (curve.length - 1)) * 2 - 1) * 7);
+    shaper.curve = curve;
+    shaper.oversample = '2x';
+    const tone = ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 3200;
+    const out = ctx.createGain();
+    out.gain.value = 0.2;
+    distBus = ctx.createGain();
+    distBus.connect(shaper).connect(tone).connect(out).connect(musicBus);
+  }
+  return distBus;
+}
+
+// Melodic instruments: (frequency, start, duration, volume).
+const M = () => musicBus;
+const INST = {
+  square(f, t, d, v) {
+    osc('square', f, t, d, { vol: v, attack: 0.008, decay: 0.12, sustain: 0.55, release: 0.06, filter: { freq: 3200 }, dest: M() });
+    osc('square', f, t, d, { vol: v * 0.55, detune: 10, attack: 0.008, release: 0.06, filter: { freq: 2400 }, dest: M() });
+  },
+  triangle(f, t, d, v) {
+    osc('triangle', f, t, d, { vol: v, attack: 0.003, decay: 0.08, sustain: 0.2, dest: M() });
+  },
+  sawtooth(f, t, d, v) {
+    osc('sawtooth', f, t, d, { vol: v * 0.7, attack: 0.003, decay: 0.1, sustain: 0.25, release: 0.05, filter: { freq: 3000, to: 900, time: 0.12 }, dest: M() });
+  },
+  synthlead(f, t, d, v) {
+    for (const det of [-7, 7]) osc('sawtooth', f, t, d, { vol: v * 0.6, detune: det, attack: 0.02, decay: 0.2, sustain: 0.7, release: 0.2, vib: [5.5, 18], filter: { freq: 2600 }, dest: M() });
+  },
+  supersaw(f, t, d, v) {
+    for (const det of [-16, -6, 6, 16]) osc('sawtooth', f, t, d, { vol: v * 0.4, detune: det, attack: 0.01, decay: 0.3, sustain: 0.7, release: 0.25, filter: { freq: 4200 }, dest: M() });
+  },
+  pluck(f, t, d, v) {
+    const len = Math.min(d, 0.45);
+    osc('sawtooth', f, t, len, { vol: v * 0.9, attack: 0.002, decay: 0.25, sustain: 0.05, release: 0.12, filter: { freq: 4500, to: 500, time: 0.25, q: 2 }, dest: M() });
+    osc('triangle', f * 2, t, len * 0.5, { vol: v * 0.3, attack: 0.001, decay: 0.12, sustain: 0.05, dest: M() });
+  },
+  flute(f, t, d, v) {
+    osc('sine', f, t, d, { vol: v * 1.3, attack: 0.04, decay: 0.15, sustain: 0.8, release: 0.08, vib: [5.5, 12], dest: M() });
+    osc('triangle', f * 2, t, d, { vol: v * 0.12, attack: 0.05, sustain: 0.6, dest: M() });
+    noise(t, 0.05, { vol: v * 0.25, type: 'bandpass', freq: f * 3, q: 3, dest: M() });
+  },
+  panflute(f, t, d, v) {
+    osc('sine', f, t, d, { vol: v * 1.4, attack: 0.07, decay: 0.3, sustain: 0.7, release: 0.25, vib: [4.5, 16], dest: M() });
+    noise(t, d * 0.8, { vol: v * 0.12, type: 'bandpass', freq: f * 2, q: 6, attack: 0.05, dest: M() });
+  },
+  bell(f, t, d, v) {
+    bell(f * 2, t, v * 0.9, 1.4, M());
+  },
+  steel(f, t, d, v) {
+    for (const [m, a] of [[1, 1], [2, 0.5], [3.01, 0.22], [4.2, 0.08]]) {
+      osc('sine', f * m, t, 0.01, { vol: v * 1.2 * a, attack: 0.002, decay: 0.45 / m, sustain: 0.001, release: 0.05, dest: M() });
+    }
+  },
+  marimba(f, t, d, v) {
+    osc('sine', f, t, 0.01, { vol: v, attack: 0.002, decay: 0.3, sustain: 0.001, release: 0.05, dest: M() });
+    osc('sine', f * 3.93, t, 0.01, { vol: v * 0.3, attack: 0.001, decay: 0.05, sustain: 0.001, release: 0.02, dest: M() });
+  },
+  chip(f, t, d, v) {
+    osc('square', f, t, d * 0.8, { vol: v * 0.8, attack: 0.001, decay: 0.04, sustain: 0.6, release: 0.01, dest: M() });
+  },
+  distlead(f, t, d, v) {
+    osc('sawtooth', f, t, d, { vol: v * 2.2, attack: 0.005, decay: 0.2, sustain: 0.8, release: 0.1, vib: [6, 22], dest: getDist() });
+  },
+};
+
 function playDrum(kind, t) {
   const dest = musicBus;
-  if (kind === 'k') {
-    osc('sine', 150, t, 0.16, { vol: 0.9, slide: -110, slideTime: 0.11, attack: 0.002, decay: 0.15, sustain: 0.01, dest });
-    noise(t, 0.01, { vol: 0.15, type: 'highpass', freq: 3000, dest });
-  } else if (kind === 's') {
-    noise(t, 0.12, { vol: 0.35, type: 'highpass', freq: 1400, dest });
-    osc('triangle', 200, t, 0.06, { vol: 0.25, slide: -60, dest });
-  } else if (kind === 'h') {
-    noise(t, 0.02, { vol: 0.12, type: 'highpass', freq: 8000, dest });
-  } else if (kind === 'o') {
-    noise(t, 0.12, { vol: 0.1, type: 'highpass', freq: 7000, dest });
-  } else if (kind === 't') {
-    osc('sine', 220, t, 0.12, { vol: 0.35, slide: -90, dest });
+  switch (kind) {
+    case 'k':
+      osc('sine', 150, t, 0.16, { vol: 0.9, slide: -110, slideTime: 0.11, attack: 0.002, decay: 0.15, sustain: 0.01, dest });
+      noise(t, 0.01, { vol: 0.15, type: 'highpass', freq: 3000, dest });
+      break;
+    case 'q':
+      osc('sine', 130, t, 0.1, { vol: 0.45, slide: -80, slideTime: 0.08, attack: 0.002, decay: 0.09, sustain: 0.01, dest });
+      break;
+    case 's':
+      noise(t, 0.12, { vol: 0.35, type: 'highpass', freq: 1400, dest });
+      osc('triangle', 200, t, 0.06, { vol: 0.25, slide: -60, dest });
+      break;
+    case 'S':
+      noise(t, 0.3, { vol: 0.42, type: 'highpass', freq: 900, dest });
+      osc('triangle', 180, t, 0.1, { vol: 0.3, slide: -60, dest });
+      break;
+    case 'C':
+      for (const dt of [0, 0.011, 0.022]) noise(t + dt, 0.012, { vol: 0.28, type: 'bandpass', freq: 1500, q: 1.5, dest });
+      noise(t + 0.03, 0.14, { vol: 0.18, type: 'bandpass', freq: 1500, dest });
+      break;
+    case 'h':
+      noise(t, 0.02, { vol: 0.12, type: 'highpass', freq: 8000, dest });
+      break;
+    case 'o':
+      noise(t, 0.12, { vol: 0.1, type: 'highpass', freq: 7000, dest });
+      break;
+    case 't':
+      osc('sine', 220, t, 0.12, { vol: 0.35, slide: -90, dest });
+      break;
+    case 'T':
+      osc('sine', 330, t, 0.1, { vol: 0.3, slide: -120, dest });
+      break;
+    case 'd':
+      osc('sine', 120, t, 0.22, { vol: 0.6, slide: -55, attack: 0.002, decay: 0.2, sustain: 0.05, dest });
+      noise(t, 0.03, { vol: 0.12, type: 'lowpass', freq: 500, dest });
+      break;
+    case 'x':
+      noise(t, 0.035, { vol: 0.3, type: 'bandpass', freq: 3500, q: 3, dest });
+      osc('triangle', 900, t, 0.03, { vol: 0.08, dest });
+      break;
+    case 'g':
+      noise(t, 0.03, { vol: 0.07, type: 'bandpass', freq: 6500, q: 2, dest });
+      break;
+    case 'j':
+      noise(t, 0.05, { vol: 0.07, type: 'highpass', freq: 8500, dest });
+      if (Math.random() < 0.4) osc('sine', 5200 + Math.random() * 800, t, 0.01, { vol: 0.02, decay: 0.08, sustain: 0.001, dest });
+      break;
+    case 'r':
+      noise(t, 0.02, { vol: 0.3, type: 'bandpass', freq: 1800, q: 4, dest });
+      osc('sine', 800, t, 0.02, { vol: 0.12, dest });
+      break;
+    case 'K':
+      playDrum('k', t);
+      playDrum('r', t);
+      break;
   }
 }
 
-function tickMusic() {
+function bassNote(inst, m, t, dur, vol = 1) {
+  const f = midiHz(m);
+  const dest = musicBus;
+  if (inst === 'sine') {
+    osc('sine', f, t, dur, { vol: 0.4 * vol, attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.08, dest });
+    osc('triangle', f * 2, t, dur * 0.5, { vol: 0.05 * vol, dest });
+  } else if (inst === 'square') {
+    osc('square', f, t, dur, { vol: 0.11 * vol, attack: 0.002, decay: 0.05, sustain: 0.7, release: 0.02, filter: { freq: 2500 }, dest });
+  } else if (inst === 'dist') {
+    osc('sawtooth', f, t, dur, { vol: 0.35 * vol, attack: 0.002, decay: 0.06, sustain: 0.4, release: 0.03, filter: { freq: 900 }, dest: getDist() });
+  } else if (inst === 'synth') {
+    osc('sawtooth', f, t, dur, { vol: 0.2 * vol, attack: 0.003, decay: 0.12, sustain: 0.3, release: 0.05, filter: { freq: 2200, to: 250, time: 0.14, q: 4 }, dest });
+    osc('sine', f, t, dur, { vol: 0.22 * vol, dest });
+  } else {
+    osc('sawtooth', f, t, dur, { vol: 0.22 * vol, attack: 0.004, decay: 0.1, sustain: 0.5, release: 0.05, filter: { freq: 1400, to: 300, time: 0.15 }, dest });
+    osc('sine', f, t, dur, { vol: 0.25 * vol, dest });
+  }
+}
+
+function playBass(song, s, meter, chord, t, spb) {
+  const root = chord[0] - 24, third = chord[1] - 24, fifth = chord[2] - 24, oct = root + 12;
+  const play = (m, len, vol) => bassNote(song.bassInst, m, t, spb * len, vol);
+  switch (song.bass) {
+    case 'drone':
+      if (s === 0) play(root, meter * 0.95, 0.9);
+      else if (s === meter / 2) play(fifth, meter * 0.45, 0.5);
+      break;
+    case 'octave8':
+      if (s % 2 === 0) play(s % 4 === 0 ? root : oct, 1.5);
+      break;
+    case 'offbeat':
+      if (s % 4 === 2) play(root, 1.6);
+      break;
+    case 'reggae': {
+      const p = { 0: [root, 3], 3: [root, 1.5], 6: [fifth, 2], 10: [oct, 1.5], 11: [fifth, 1], 14: [third, 2] }[s];
+      if (p) play(p[0], p[1]);
+      break;
+    }
+    case 'chug':
+      if (s % 2 === 0) play(s % 8 === 6 ? fifth : root, s % 4 === 0 ? 1.4 : 0.8, s % 4 === 0 ? 1 : 0.7);
+      break;
+    case 'tuba':
+      if (s === 0) play(root, 3);
+      else if (meter === 16 && s === 8) play(fifth, 3);
+      break;
+    case 'jig':
+      if (s % 3 === 0) play([root, fifth, root, fifth][s / 3], 2);
+      break;
+    default: {
+      const p = { 0: 0, 3: 0, 6: 2, 8: 0, 11: 1, 14: 2 }[s];
+      if (p !== undefined) play(p === 1 ? fifth : p === 2 ? oct : root, 1.6);
+    }
+  }
+}
+
+function playChords(song, s, meter, chord, t, spb) {
+  const dest = musicBus;
+  switch (song.chords) {
+    case 'pad':
+      if (s === 0) {
+        for (const m of chord) {
+          for (const det of [-8, 8]) osc('sawtooth', midiHz(m - 12), t, spb * (meter - 1), { vol: 0.03, detune: det, attack: 0.25, decay: 0.5, sustain: 0.8, release: 0.4, filter: { freq: 1100 }, dest });
+        }
+      }
+      break;
+    case 'strum': {
+      // Down strokes on the beat, lighter up strokes in between.
+      const hits = meter === 12 ? { 0: 1, 6: 0.7 } : { 0: 1, 6: 0.45, 8: 0.8, 14: 0.45 };
+      const v = hits[s];
+      if (v) {
+        const notes = s % 8 === 0 || meter === 12 ? chord : [...chord].reverse();
+        notes.forEach((m, i) => INST.pluck(midiHz(m - 12), t + i * 0.015, spb * 3, 0.05 * v));
+      }
+      break;
+    }
+    case 'stab':
+      if (s === 4 || s === 12) {
+        for (const m of chord) osc('square', midiHz(m), t, spb * 0.6, { vol: 0.03, attack: 0.003, decay: 0.06, sustain: 0.3, release: 0.04, filter: { freq: 1800 }, dest });
+      }
+      break;
+    case 'waltz':
+      if (s === 4 || s === 8) {
+        for (const m of chord) osc('triangle', midiHz(m), t, spb * 1.5, { vol: 0.05, attack: 0.003, decay: 0.25, sustain: 0.2, release: 0.1, dest });
+      }
+      break;
+    case 'gated':
+      if (s % 2 === 0) {
+        for (const m of chord) for (const det of [-12, 12]) osc('sawtooth', midiHz(m), t, spb * 0.8, { vol: 0.02, detune: det, attack: 0.004, decay: 0.1, sustain: 0.4, release: 0.04, filter: { freq: 2600 }, dest });
+      }
+      break;
+    case 'power':
+      if (s === 0 || s === 8) {
+        for (const m of [chord[0] - 12, chord[0] - 5, chord[0]]) osc('sawtooth', midiHz(m), t, spb * 7, { vol: 0.12, attack: 0.005, decay: 0.3, sustain: 0.6, release: 0.1, filter: { freq: 1800 }, dest: getDist() });
+      }
+      break;
+  }
+}
+
+function tickMusic(ahead = 0.15) {
   const song = music.song;
   if (!song) return;
-  const spb = 60 / (song.bpm * music.tempoMul) / 4;
-  while (music.next < now() + 0.15) {
-    const t = music.next;
+  const meter = song.meter ?? 16, div = song.div ?? 4;
+  const spb = 60 / (song.bpm * music.tempoMul) / div;
+  while (music.next < now() + ahead) {
     const step = music.step;
-    const s16 = step % 16;
-    const bar = Math.floor(step / 16);
+    const s = step % meter;
+    const bar = Math.floor(step / meter);
+    const t = music.next + (s % 2 ? (song.swing ?? 0) * spb : 0);
     const chordDeg = song.prog[bar % song.prog.length];
     const chord = [0, 2, 4].map((k) => scaleNote(song, chordDeg + k));
 
-    // Drums
+    // Drums, with a cymbal every four bars.
     const pat = DRUMS[song.drums];
-    if (pat[s16]) playDrum(pat[s16], t);
-    if (song.drums !== 'soft' && s16 === 0 && bar % 4 === 0) noise(t, 0.6, { vol: 0.08, type: 'highpass', freq: 5000, dest: musicBus });
+    const hit = pat[s % pat.length];
+    if (hit) for (const d of hit.split('+')) playDrum(d, t);
+    if (song.drums !== 'soft' && s === 0 && bar % 4 === 0) noise(t, 0.6, { vol: 0.08, type: 'highpass', freq: 5000, dest: musicBus });
 
-    // Bass: root / fifth / octave bounce
-    const bassPat = { 0: 0, 3: 0, 6: 2, 8: 0, 11: 1, 14: 2 };
-    if (bassPat[s16] !== undefined) {
-      const m = (bassPat[s16] === 1 ? chord[2] : bassPat[s16] === 2 ? chord[0] + 12 : chord[0]) - 24;
-      osc('sawtooth', midiHz(m), t, spb * 1.6, { vol: 0.22, attack: 0.004, decay: 0.1, sustain: 0.5, release: 0.05, filter: { freq: 1400, to: 300, time: 0.15 }, dest: musicBus });
-      osc('sine', midiHz(m), t, spb * 1.6, { vol: 0.25, dest: musicBus });
-    }
-
-    // Pad on each bar
-    if (s16 === 0) {
-      for (const m of chord) {
-        for (const det of [-8, 8]) osc('sawtooth', midiHz(m - 12), t, spb * 15, { vol: 0.03, detune: det, attack: 0.25, decay: 0.5, sustain: 0.8, release: 0.4, filter: { freq: 1100 }, dest: musicBus });
-      }
-    }
+    playBass(song, s, meter, chord, t, spb);
+    playChords(song, s, meter, chord, t, spb);
 
     // Arpeggio
-    const arpNotes = [...chord, chord[0] + 12];
-    if (song.arp === 'fast' || s16 % (song.arp === 'eighths' ? 2 : 1) === 0) {
-      let idx = step % 4;
-      if (song.arp === 'updown') idx = [0, 1, 2, 3, 2, 1][step % 6] ?? 0;
-      const m = arpNotes[idx] + 12;
-      if (song.arp === 'bell') {
-        if (s16 % 2 === 0) bell(midiHz(m + 12), t, 0.025, 0.5, musicBus);
-      } else {
-        osc('triangle', midiHz(m), t, spb * 0.6, { vol: song.lead ? 0.05 : 0.07, attack: 0.003, decay: 0.08, sustain: 0.2, dest: musicBus });
+    const arp = song.arp;
+    if (arp) {
+      const every = arp.pat === 'eighths' ? 2 : 1;
+      if (s % every === 0) {
+        const notes = [...chord, chord[0] + 12];
+        const idx = arp.pat === 'updown' ? [0, 1, 2, 3, 2, 1][step % 6] : step % 4;
+        const m = notes[idx] + 12 * (arp.oct ?? 1);
+        INST[arp.inst](midiHz(m), t, spb * 0.6, 0.05 * (arp.vol ?? 1));
       }
     }
 
     // Lead melody
     if (song.lead && music.lead) {
       const phrase = music.lead[Math.floor(bar / 2) % 4];
-      const local = (bar % 2) * 16 + s16;
+      const local = (bar % 2) * meter + s;
       for (const n of phrase) {
         if (n.step !== local) continue;
         const m = scaleNote(song, chordDeg + n.deg, 1 + n.oct);
-        const dur = spb * n.len * 0.92;
-        osc(song.lead, midiHz(m), t, dur, { vol: 0.07, attack: 0.008, decay: 0.12, sustain: 0.55, release: 0.06, filter: { freq: 3200 }, dest: musicBus });
-        osc(song.lead, midiHz(m), t, dur, { vol: 0.04, detune: 10, attack: 0.008, release: 0.06, filter: { freq: 2400 }, dest: musicBus });
+        INST[song.lead.inst](midiHz(m), t, spb * n.len * 0.92, 0.07 * (song.lead.vol ?? 1));
       }
     }
 
@@ -512,13 +764,18 @@ export function startMusic(name) {
   if (!song) return;
   music.name = name;
   music.song = song;
-  music.lead = composeLead(song);
+  music.lead = song.lead ? composeLead(song) : null;
   music.step = 0;
   music.tempoMul = music.finalLap && name !== 'star' ? 1.12 : 1;
   music.next = now() + 0.08;
   musicBus.gain.cancelScheduledValues(now());
   musicBus.gain.setValueAtTime(0.42, now());
   music.timer = setInterval(tickMusic, 25);
+}
+
+// Schedule the current song `seconds` ahead in one go (offline rendering in tests).
+export function scheduleMusic(seconds) {
+  tickMusic(seconds);
 }
 
 export function stopMusic() {

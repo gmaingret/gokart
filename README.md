@@ -26,7 +26,9 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - Bloom + colour grading, real-time shadows, tyre marks, grass and wind-blown trees,
   shimmering water, glowing lava and kart head/brake lights (all switched off by **Graphics: Low**)
 - Synthesized sound: engines with gear shifts, tyre screech, layered effects and an original soundtrack
-  per track (speeds up on the final lap, switches to a star theme with star power)
+  in a different style for each track: pop-rock, desert darbuka, sleigh-bell waltz, synthwave,
+  Celtic jig, reggae with steel drums, metal, chiptune, tribal marimba and trance (it speeds up on
+  the final lap and switches to a star theme with star power)
 - Phones vibrate when you get hit, grab an item or boost (Android)
 - Drop-in reconnects: a phone or the TV can reload mid-race and pick up where it was
 

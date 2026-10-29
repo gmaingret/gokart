@@ -24,7 +24,7 @@ void main() {
   float h = d.y;
   vec3 col = h > 0.0 ? mix(uHorizon, uTop, pow(clamp(h, 0.0, 1.0), 0.55)) : mix(uHorizon, uBottom, clamp(-h * 4.0, 0.0, 1.0));
   float s = max(0.0, dot(d, normalize(uSunDir)));
-  col += uSunColor * (pow(s, 900.0 / uSunSize) * 1.6 + pow(s, 12.0) * 0.28);
+  col += uSunColor * (pow(s, 900.0 / uSunSize) * 4.0 + pow(s, 12.0) * 0.28);
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;

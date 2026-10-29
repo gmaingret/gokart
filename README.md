@@ -7,19 +7,28 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - **Split screen** for every human player (1 → full screen, 2 → top/bottom, 3–4 → 2×2, up to 4×2),
   with a live minimap and standings
 - **10 tracks**: Sunny Circuit, Dune Dash, Frosty Peaks, Neon Night, Autumn Woods, Beach Bay,
-  Lava Castle, Candy Land, Jungle Ruins and Cosmic Way (each also has its own battle arena)
+  Lava Castle, Candy Land, Jungle Ruins and Cosmic Way (each also has its own battle arena).
+  Each one has its own layout: hills and climbs, narrow and wide sections, jump ramps (press
+  DRIFT just after take-off for a trick and a boost on landing), dirt-path shortcuts on six
+  tracks, a figure-8 with a bridge on Cosmic Way, and track hazards: rolling barrels, boulders,
+  snowballs and tumbleweeds, lava geysers that launch you, neon/gumdrop bumpers and beach crabs
 - **Drifting with mini-turbos** (blue → orange → pink sparks), boost pads, rocket starts
 - **Items** from `?` boxes, weighted by position: banana, green shell, homing red shell,
   mushroom, triple mushroom, star and lightning
 - 50cc / 100cc / 150cc, 1–7 laps, cup points that carry across races
-- **Balloon Battle** mode: everyone starts with 3 balloons in a walled arena (themed like the
-  selected track). Each shell, banana or star hit pops one; ram a rival while boosting to steal
+- **Balloon Battle** mode: everyone starts with 3 balloons in a walled arena themed like the
+  selected track, in one of five shapes: round bowl, square, ring around an island, cross, or a
+  pyramid with a raised centre platform reached by ramps (and you can drive off its edge). Each shell, banana or star hit pops one; ram a rival while boosting to steal
   one. Out of balloons = eliminated (you keep driving as a ghost). Last one standing wins, or
   whoever has the most balloons after 3 minutes
 - Hilly themed worlds with scenery, grandstand crowds, neon city skyline at night, sky with clouds and weather
 - Particle effects: drift sparks, tyre smoke, dust, boost flames, item explosions, confetti
+- Bloom + colour grading, real-time shadows, tyre marks, grass and wind-blown trees,
+  shimmering water, glowing lava and kart head/brake lights (all switched off by **Graphics: Low**)
 - Synthesized sound: engines with gear shifts, tyre screech, layered effects and an original soundtrack
-  per track (speeds up on the final lap, switches to a star theme with star power)
+  in a different style for each track: pop-rock, desert darbuka, sleigh-bell waltz, synthwave,
+  Celtic jig, reggae with steel drums, metal, chiptune, tribal marimba and trance (it speeds up on
+  the final lap and switches to a star theme with star power)
 - Phones vibrate when you get hit, grab an item or boost (Android)
 - Drop-in reconnects: a phone or the TV can reload mid-race and pick up where it was
 
@@ -100,7 +109,7 @@ so on a plain-http home network use slide steering there.
 ## TV / keyboard controls
 
 - TV remote in the lobby: ▲▼ choose a setting, ◀▶ change it, OK starts the race; OK on the results screen continues.
-- **Graphics: Low** in the lobby setup trades effects and resolution for speed — use it if the TV browser stutters.
+- **Graphics: Low** in the lobby setup turns off bloom, shadows, reflections and tyre marks and lowers resolution — use it if the TV browser stutters.
 - **K** adds a keyboard racer (arrows/WASD, Space to drift, X to use an item) — handy for testing without phones.
 - **Esc** ends the current race.
 
@@ -135,7 +144,16 @@ npm test          # relay + track geometry tests
 
 All tracks are generated from a handful of control points in `public/tv/track.js`. Add a
 new entry to `TRACKS` (and its name to `TRACK_NAMES` in `public/shared/config.js`); the tests
-check that the new layout never overlaps itself.
+check that the new layout never overlaps itself. Optional per-track fields:
+
+| Field | Meaning |
+| --- | --- |
+| `elev: [[frac, metres], ...]` | road height along the lap (smoothly interpolated) |
+| `width: [[frac, halfWidth], ...]` | road half-width along the lap (6.5–12 m) |
+| `jumps: [frac, ...]` | kicker ramps |
+| `bridge: [fracA, fracB]` | stretch drawn as a bridge deck (for crossings) |
+| `shortcut: [fracA, fracB]` | open both barriers where these two stretches pass close by |
+| `hazards: [[kind, frac], ...]` | `barrel`, `boulder`, `snowball`, `tumbleweed`, `geyser`, `orb`, `gumdrop`, `crab` |
 
 ## Troubleshooting
 

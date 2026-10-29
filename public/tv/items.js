@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { WALL } from './track.js';
 import { KART_RADIUS } from './kart.js';
 
 export const ITEM_TYPES = ['banana', 'green', 'red', 'mushroom', 'triple', 'star', 'lightning'];
@@ -112,10 +111,11 @@ export class Items {
       const mesh = new THREE.Group();
       mesh.add(new THREE.Mesh(innerGeo, inner));
       mesh.add(new THREE.Mesh(geo, this.boxShell));
-      mesh.position.set(s.x, 1.3, s.z);
+      const y = s.y ?? 0;
+      mesh.position.set(s.x, y + 1.3, s.z);
       mesh.rotation.set(0.6, Math.random() * 6, 0.6);
       this.group.add(mesh);
-      this.boxes.push({ x: s.x, z: s.z, mesh, wait: 0 });
+      this.boxes.push({ x: s.x, y, z: s.z, mesh, wait: 0 });
     }
   }
 
@@ -123,11 +123,20 @@ export class Items {
     this.scene.remove(this.group);
   }
 
+  // Ground height for an item at (o.x, o.z), near height `nearY`.
+  groundAt(o, nearY) {
+    if (this.track.arena) return this.track.arena.groundAt(o.x, o.z, nearY);
+    const loc = this.track.cl.locate(o.x, o.z, o.idx ?? -1, nearY);
+    o.idx = loc.idx;
+    return this.track.cl.groundAt(loc);
+  }
+
   spawn(type, owner, opts = {}) {
     const mesh = type === 'banana' ? bananaMesh() : shellMesh(type === 'red' ? 0xe53935 : 0x2fbf4a);
     const o = { type, owner, mesh, life: type === 'banana' ? 120 : type === 'red' ? 10 : 7, bounces: 0, grace: 0.35, ...opts };
-    o.idx = this.track.arena ? 0 : this.track.cl.locate(o.x, o.z, owner.idx).idx;
-    mesh.position.set(o.x, 0, o.z);
+    o.idx = this.track.arena ? 0 : this.track.cl.locate(o.x, o.z, owner.idx, owner.y).idx;
+    o.y = this.groundAt(o, owner.y);
+    mesh.position.set(o.x, o.y, o.z);
     this.group.add(mesh);
     this.objects.push(o);
     return o;
@@ -230,10 +239,10 @@ export class Items {
       }
       b.mesh.rotation.y += dt * 1.5;
       b.mesh.rotation.x += dt * 0.7;
-      b.mesh.position.y = 1.3 + Math.sin(time * 2 + b.x) * 0.2;
+      b.mesh.position.y = b.y + 1.3 + Math.sin(time * 2 + b.x) * 0.2;
       for (const k of karts) {
         const dx = k.x - b.x, dz = k.z - b.z;
-        if (dx * dx + dz * dz < (KART_RADIUS + 1.0) ** 2) {
+        if (dx * dx + dz * dz < (KART_RADIUS + 1.0) ** 2 && Math.abs(k.y - b.y) < 3) {
           b.wait = BOX_RESPAWN;
           b.mesh.visible = false;
           if (!k.item && k.roulette <= 0) {
@@ -284,15 +293,13 @@ export class Items {
             continue;
           }
           o.mesh.rotation.y += dt * 12;
-          if (this.fx && Math.random() < 0.8) this.fx.trail(o.x, 0.5, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
-          o.mesh.position.set(o.x, 0, o.z);
         }
       }
       if (o.type !== 'banana' && !this.track.arena) {
-        const loc = cl.locate(o.x, o.z, o.idx);
+        const loc = cl.locate(o.x, o.z, o.idx, o.y);
         o.idx = loc.idx;
-        const limit = WALL - 0.8;
-        if (Math.abs(loc.lateral) > limit) {
+        const limit = cl.wall[loc.i] - 0.8;
+        if (Math.abs(loc.lateral) > limit && cl.gap[loc.i] !== Math.sign(loc.lateral)) {
           const nx = cl.nx[loc.i], nz = cl.nz[loc.i];
           const s = Math.sign(loc.lateral);
           o.x -= nx * (Math.abs(loc.lateral) - limit) * s;
@@ -308,16 +315,20 @@ export class Items {
           }
         }
         o.mesh.rotation.y += dt * 12;
-        if (this.fx && Math.random() < 0.8) this.fx.trail(o.x, 0.5, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
       }
-      o.mesh.position.set(o.x, 0, o.z);
+      // Shells hug the ground (and fly off jump lips briefly, which is fine).
+      if (o.type !== 'banana') {
+        o.y = this.groundAt(o, o.y);
+        if (this.fx && Math.random() < 0.8) this.fx.trail(o.x, o.y + 0.5, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
+      }
+      o.mesh.position.set(o.x, o.y, o.z);
 
       // Hits on karts.
       for (const k of karts) {
         if (k === o.owner && o.grace > 0) continue;
         const dx = k.x - o.x, dz = k.z - o.z;
         const r = KART_RADIUS * (k.shrink > 0 ? 0.6 : 1) + 0.6;
-        if (dx * dx + dz * dz < r * r) {
+        if (dx * dx + dz * dz < r * r && Math.abs(k.y - o.y) < 2) {
           if (k.hit()) this.sfx(o.type === 'banana' ? 'slip' : 'hit');
           else if (k.star > 0) this.sfx('bump');
           this.boom(o);
@@ -330,7 +341,7 @@ export class Items {
       for (const p of this.objects) {
         if (p === o || p.dead) continue;
         const dx = p.x - o.x, dz = p.z - o.z;
-        if (dx * dx + dz * dz < 1.6 * 1.6) {
+        if (dx * dx + dz * dz < 1.6 * 1.6 && Math.abs(p.y - o.y) < 2) {
           this.boom(o);
           this.remove(o);
           this.remove(p);
@@ -344,8 +355,8 @@ export class Items {
 
   boom(o) {
     if (!this.fx) return;
-    if (o.type === 'banana') this.fx.burst(o.x, 0.8, o.z, [0xffe14d, 0xfff7c2], 12, 5, 0);
-    else this.fx.explosion(o.x, 0, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
+    if (o.type === 'banana') this.fx.burst(o.x, o.y + 0.8, o.z, [0xffe14d, 0xfff7c2], 12, 5, 0);
+    else this.fx.explosion(o.x, o.y, o.z, o.type === 'red' ? 0xff4040 : 0x40ff70);
   }
 
   steerRed(o, dt, order) {
@@ -376,6 +387,9 @@ export class Items {
 
   // Bananas near a point (AI avoidance).
   hazardsNear(x, z, r) {
-    return this.objects.filter((o) => (o.x - x) ** 2 + (o.z - z) ** 2 < r * r);
+    const list = this.objects.filter((o) => (o.x - x) ** 2 + (o.z - z) ** 2 < r * r);
+    // Track hazards (rollers, bumpers, geysers) are worth dodging too.
+    if (this.hazards) for (const h of this.hazards.near(x, z, r)) list.push(h);
+    return list;
   }
 }

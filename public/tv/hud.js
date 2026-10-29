@@ -217,12 +217,29 @@ function drawArenaMap(g, r, arena, karts) {
   const P = (x, z) => [cx - x * sc, cy - z * sc];
   g.save();
   g.beginPath();
-  g.arc(cx, cy, arena.R * sc, 0, Math.PI * 2);
+  arena.outline.forEach(([x, z], i) => {
+    const [px, py] = P(x, z);
+    if (i) g.lineTo(px, py);
+    else g.moveTo(px, py);
+  });
+  g.closePath();
   g.fillStyle = 'rgba(255,255,255,0.15)';
   g.fill();
   g.lineWidth = 4;
   g.strokeStyle = 'rgba(255,255,255,0.85)';
   g.stroke();
+  if (arena.platform) {
+    const { half, rampL, rampW } = arena.platform;
+    g.fillStyle = 'rgba(255,255,255,0.3)';
+    const [x0, y0] = P(half, half);
+    g.fillRect(x0, y0, half * 2 * sc, half * 2 * sc);
+    g.fillStyle = 'rgba(255,207,51,0.5)';
+    for (const [ux, uz] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) {
+      const [ax, ay] = P(ux * half + uz * rampW, uz * half + ux * rampW);
+      const [bx, by] = P(ux * (half + rampL) - uz * rampW, uz * (half + rampL) - ux * rampW);
+      g.fillRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay));
+    }
+  }
   g.fillStyle = 'rgba(0,0,0,0.55)';
   for (const o of arena.obstacles) {
     const [x, y] = P(o.x, o.z);

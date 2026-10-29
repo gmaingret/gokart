@@ -91,8 +91,8 @@ class Pool {
       const d = Math.exp(-o.drag * dt);
       o.vx *= d; o.vy *= d; o.vz *= d;
       o.x += o.vx * dt; o.y += o.vy * dt; o.z += o.vz * dt;
-      if (o.y < 0.05 && o.g > 0) {
-        o.y = 0.05;
+      if (o.y < o.fl && o.g > 0) {
+        o.y = o.fl;
         o.vy = -o.vy * 0.3;
         o.vx *= 0.7; o.vz *= 0.7;
       }
@@ -145,6 +145,8 @@ export class FX {
       vy: (o.vy ?? 0) + (Math.random() - 0.5) * sp * (o.spreadY ?? 1),
       vz: (o.vz ?? 0) + (Math.random() - 0.5) * sp,
       g: o.g ?? 0,
+      // Bounce height: the ground just below where it was emitted.
+      fl: o.floor ?? y - 1.5,
       drag: o.drag ?? 1,
       t: 0,
       life: (o.life ?? 0.5) * (0.75 + Math.random() * 0.5),
@@ -183,7 +185,7 @@ export class FX {
   confetti(x, y, z, n = 60) {
     const cols = [0xff4f7b, 0xffcf33, 0x3fd2ff, 0x7dff6e, 0xb784ff, 0xffffff];
     for (let i = 0; i < n * this.density; i++) {
-      this.spawn(false, x, y + 4, z, { color: cols[i % cols.length], vy: 7, spread: 12, spreadY: 0.6, g: 6, drag: 2.2, life: 2.4, s0: 0.45, s1: 0.4, a: 1, shape: 2 });
+      this.spawn(false, x, y + 4, z, { floor: y + 0.05, color: cols[i % cols.length], vy: 7, spread: 12, spreadY: 0.6, g: 6, drag: 2.2, life: 2.4, s0: 0.45, s1: 0.4, a: 1, shape: 2 });
     }
   }
   sparkle(x, y, z, color) {
@@ -194,7 +196,7 @@ export class FX {
   }
 
   // Ambient weather around a point (each human camera).
-  ambient(dt, x, z, kind) {
+  ambient(dt, x, z, kind, y0 = 0) {
     if (!kind) return;
     const rate = kind === 'snow' ? 90 : kind === 'leaves' || kind === 'sprinkles' ? 40 : 25;
     const r = rate * dt * this.density;
@@ -202,22 +204,22 @@ export class FX {
     for (let i = 0; i < n; i++) {
       const px = x + (Math.random() - 0.5) * 70, pz = z + (Math.random() - 0.5) * 70;
       if (kind === 'snow') {
-        this.spawn(false, px, 14 + Math.random() * 6, pz, { color: 0xffffff, vy: -3, vx: 1, spread: 1, drag: 0.2, life: 5, s0: 0.35, s1: 0.35, a: 0.9 });
+        this.spawn(false, px, y0 + 14 + Math.random() * 6, pz, { color: 0xffffff, vy: -3, vx: 1, spread: 1, drag: 0.2, life: 5, s0: 0.35, s1: 0.35, a: 0.9 });
       } else if (kind === 'motes') {
         const c = Math.random() < 0.5 ? 0x00e5ff : 0xff2bd6;
-        this.spawn(true, px, 0.5 + Math.random() * 8, pz, { color: c, vy: 0.5, spread: 0.6, drag: 0.2, life: 3.5, s0: 0.5, s1: 0.2, a: 0.8 });
+        this.spawn(true, px, y0 + 0.5 + Math.random() * 8, pz, { color: c, vy: 0.5, spread: 0.6, drag: 0.2, life: 3.5, s0: 0.5, s1: 0.2, a: 0.8 });
       } else if (kind === 'sand') {
-        this.spawn(false, px, 0.3 + Math.random() * 2, pz, { color: 0xf0d39a, vx: 6, vy: 0.2, spread: 1.5, drag: 0.3, life: 2.5, s0: 0.6, s1: 1.4, a: 0.25 });
+        this.spawn(false, px, y0 + 0.3 + Math.random() * 2, pz, { color: 0xf0d39a, vx: 6, vy: 0.2, spread: 1.5, drag: 0.3, life: 2.5, s0: 0.6, s1: 1.4, a: 0.25 });
       } else if (kind === 'leaves') {
         const c = [0xe67e22, 0xc0392b, 0xf1c40f, 0xb5651d][Math.floor(Math.random() * 4)];
-        this.spawn(false, px, 8 + Math.random() * 8, pz, { color: c, vy: -1.6, vx: 1.2, spread: 2, drag: 0.4, life: 6, s0: 0.5, s1: 0.45, a: 0.95, shape: 2 });
+        this.spawn(false, px, y0 + 8 + Math.random() * 8, pz, { color: c, vy: -1.6, vx: 1.2, spread: 2, drag: 0.4, life: 6, s0: 0.5, s1: 0.45, a: 0.95, shape: 2 });
       } else if (kind === 'embers') {
-        this.spawn(true, px, 0.3 + Math.random() * 2, pz, { color: Math.random() < 0.5 ? 0xff5a00 : 0xffb040, vy: 2.5, spread: 1.2, drag: 0.3, life: 3, s0: 0.35, s1: 0.05, a: 1 });
+        this.spawn(true, px, y0 + 0.3 + Math.random() * 2, pz, { color: Math.random() < 0.5 ? 0xff5a00 : 0xffb040, vy: 2.5, spread: 1.2, drag: 0.3, life: 3, s0: 0.35, s1: 0.05, a: 1 });
       } else if (kind === 'sprinkles') {
         const c = [0xff6fb5, 0x7fdbff, 0xffe14d, 0x7dff6e, 0xb784ff][Math.floor(Math.random() * 5)];
-        this.spawn(false, px, 10 + Math.random() * 6, pz, { color: c, vy: -3, spread: 0.6, drag: 0.2, life: 5, s0: 0.18, s1: 0.18, a: 1 });
+        this.spawn(false, px, y0 + 10 + Math.random() * 6, pz, { color: c, vy: -3, spread: 0.6, drag: 0.2, life: 5, s0: 0.18, s1: 0.18, a: 1 });
       } else if (kind === 'pollen') {
-        this.spawn(true, px, 1 + Math.random() * 6, pz, { color: 0xfff6b0, vy: 0.2, spread: 0.5, drag: 0.3, life: 4, s0: 0.25, s1: 0.2, a: 0.6 });
+        this.spawn(true, px, y0 + 1 + Math.random() * 6, pz, { color: 0xfff6b0, vy: 0.2, spread: 0.5, drag: 0.3, life: 4, s0: 0.25, s1: 0.2, a: 0.6 });
       }
     }
   }

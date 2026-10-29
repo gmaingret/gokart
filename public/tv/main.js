@@ -6,7 +6,11 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Kart, collideKarts, DRIFT_TIERS, setLowQuality } from './kart.js';
 import { FX } from './fx.js';
 import { Sky } from './sky.js';
+import { Post } from './post.js';
+import { Skids } from './skids.js';
+import { wind } from './wind.js';
 import { Items } from './items.js';
+import { Hazards } from './hazards.js';
 import { driveBot, botSpeedMult, driveBattle } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
 import * as audio from './audio.js';
@@ -55,18 +59,37 @@ scene.environmentIntensity = 0.7;
 const hemi = new THREE.HemisphereLight(0xffffff, 0x446644, 1);
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(120, 200, 60);
-scene.add(hemi, sun);
+// Real-time shadows in a box that follows whichever camera is rendering.
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -48, right: 48, top: 48, bottom: -48, near: 1, far: 420 });
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.04;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+scene.add(hemi, sun, sun.target);
+const sunDir = new THREE.Vector3(0.5, 0.45, 0.3).normalize();
 const sky = new Sky(scene);
 const fx = new FX(scene);
+const post = new Post(renderer);
+const skids = new Skids(scene);
+const high = () => cfg.gfx !== 'low';
 const lobbyCam = new THREE.PerspectiveCamera(55, 1, 0.5, 1500);
 
 function applyGfx() {
   const dpr = window.devicePixelRatio || 1;
   renderer.setPixelRatio(cfg.gfx === 'low' ? Math.min(dpr, 1) * 0.75 : Math.min(dpr, 1.5));
   fx.density = cfg.gfx === 'low' ? 0.35 : 1;
-  // Low: no reflections and plain kart materials (applies from the next race).
+  // Low: no reflections, shadows, bloom or tyre marks, and plain kart materials (from the next race).
   scene.environment = cfg.gfx === 'low' ? null : envMap;
   setLowQuality(cfg.gfx === 'low');
+  const shadows = high();
+  if (renderer.shadowMap.enabled !== shadows) {
+    renderer.shadowMap.enabled = shadows;
+    sun.castShadow = shadows;
+    scene.traverse((o) => {
+      if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true;
+    });
+  }
+  post.setSize(W || 1, H || 1, renderer.getPixelRatio());
   if (W) renderer.setSize(W, H, false);
 }
 
@@ -75,6 +98,7 @@ function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
   renderer.setSize(W, H, false);
+  post.setSize(W, H, renderer.getPixelRatio());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   hudCanvas.width = W * dpr;
   hudCanvas.height = H * dpr;
@@ -118,7 +142,9 @@ function loadTrack(i) {
   scene.background = new THREE.Color(t.fog[0]);
   scene.fog = new THREE.Fog(t.fog[0], t.fog[1], t.fog[2]);
   const sd = t.sky.sunDir ?? [0.5, 0.45, 0.3];
-  sun.position.set(sd[0] * 300, sd[1] * 300, sd[2] * 300);
+  sunDir.set(sd[0], Math.max(0.25, sd[1]), sd[2]).normalize();
+  post.setTheme(t);
+  skids.clear();
   fx.clear();
   lobbyS = 0;
   hemi.color.setHex(t.hemi[0]);
@@ -422,7 +448,10 @@ function startRace() {
   if (!humans.length) return;
   audio.initAudio();
   loadTrack(cfg.track);
-  if (race) race.items.dispose();
+  if (race) {
+    race.items.dispose();
+    race.hazards?.dispose();
+  }
   for (const k of race?.karts || []) scene.remove(k.model.root);
 
   const used = new Set(humans.map((p) => p.driver));
@@ -476,7 +505,12 @@ function startRace() {
     star: false,
     homingT: 0,
   };
+  if (!battle && track.def.hazards) {
+    race.hazards = new Hazards(scene, track, fx, playSfx);
+    race.items.hazards = race.hazards;
+  }
   fx.clear();
+  skids.clear();
   track.setStartLights(0);
   for (const [k, cam] of humanKarts.map((k, i) => [k, cams[i]])) snapCamera(cam, k);
   phase = 'countdown';
@@ -494,6 +528,7 @@ function startRace() {
 function toLobby() {
   if (race) {
     race.items.dispose();
+    race.hazards?.dispose();
     for (const k of race.karts) scene.remove(k.model.root);
   }
   for (const p of players.values()) p.kart = null;
@@ -588,7 +623,7 @@ function stepRace(dt) {
       let di = k.idx - pad.idx;
       if (di > r.track.cl.n / 2) di -= r.track.cl.n;
       if (di < -r.track.cl.n / 2) di += r.track.cl.n;
-      if (k.padCd <= 0 && Math.abs(di) <= 2 && Math.abs(k.lateral - pad.lat) < 2.3) {
+      if (k.padCd <= 0 && !k.air && Math.abs(di) <= 2 && Math.abs(k.lateral - pad.lat) < 2.3) {
         k.giveBoost(0.9);
         k.padCd = 1;
         if (k.human) audio.sfx('pad');
@@ -623,6 +658,7 @@ function stepRace(dt) {
   if (r.mode === 'battle') ramSteals(alive);
   collideKarts(alive);
   r.items.update(dt, alive, r.order, r.time);
+  r.hazards?.update(dt, alive, r.time);
 
   // Order: race by progress; battle by survival, then balloons.
   r.order.sort((a, b) => {
@@ -651,7 +687,7 @@ function stepRace(dt) {
         if (['box', 'gotitem', 'boost', 'bonk', 'bump'].includes(ev)) audio.sfx(ev);
         if (ev === 'finish') {
           audio.sfx('finish');
-          fx.confetti(k.x, 0, k.z, 90);
+          fx.confetti(k.x, k.y, k.z, 90);
           r.cheer = 3;
         }
         if (ev === 'hit' || ev === 'bonk' || ev === 'zap') k.shake = ev === 'bonk' ? 0.25 : 0.6;
@@ -659,11 +695,20 @@ function stepRace(dt) {
       }
       if (ev === 'hit' && r.mode === 'battle') popBalloon(k);
       if (ev === 'hit') {
-        fx.burst(k.x, 1.5, k.z, [0xffe14d, 0xffffff], 14, 6, 1);
+        fx.burst(k.x, k.y + 1.5, k.z, [0xffe14d, 0xffffff], 14, 6, 1);
         if (!k.human) audio.sfx('bump');
       }
-      if (ev === 'box') fx.burst(k.x, 1.4, k.z, [0xff5ec4, 0xffd84d, 0x4dd2ff, 0x7dff6e], 22, 10, 2);
-      if (ev === 'boost') for (let i = 0; i < 8; i++) fx.flame(k.x - k.forwardX * 2, 0.8, k.z - k.forwardZ * 2, -k.forwardX * 6, -k.forwardZ * 6, true);
+      if (ev === 'box') fx.burst(k.x, k.y + 1.4, k.z, [0xff5ec4, 0xffd84d, 0x4dd2ff, 0x7dff6e], 22, 10, 2);
+      if (ev === 'boost') for (let i = 0; i < 8; i++) fx.flame(k.x - k.forwardX * 2, k.y + 0.8, k.z - k.forwardZ * 2, -k.forwardX * 6, -k.forwardZ * 6, true);
+      if (ev === 'land') {
+        for (let i = 0; i < 6; i++) fx.dust(k.x, k.y + 0.2, k.z, race.track.theme.dust ?? 0x999999, k.vx, k.vz);
+        if (k.human) audio.sfx('bump');
+      }
+      if (ev === 'trickstart' && k.human) audio.sfx('tier', 1);
+      if (ev === 'trick') {
+        fx.burst(k.x, k.y + 1.5, k.z, [0xffe14d, 0x7fd3ff, 0xffffff], 16, 7, 1);
+        if (k.human) flash(k, 'TRICK!', '#7fd3ff', 1);
+      }
     }
     k.events.length = 0;
     // Mini-turbo tier-up chirp.
@@ -744,7 +789,7 @@ function popBalloon(k) {
   if (k.ghost || !(k.balloons > 0)) return;
   k.balloons--;
   k.setBalloons(k.balloons);
-  fx.burst(k.x, 3.2, k.z, [new THREE.Color(k.driver.color).getHex(), 0xffffff], 22, 9, 0);
+  fx.burst(k.x, k.y + 3.2, k.z, [new THREE.Color(k.driver.color).getHex(), 0xffffff], 22, 9, 0);
   audio.sfx('pop');
   if (k.stealer && !k.stealer.ghost) {
     const thief = k.stealer;
@@ -787,7 +832,18 @@ function emitKartFx(k, dt) {
   const fwdX = k.forwardX, fwdZ = k.forwardZ;
   const sc = k.shrink > 0 ? 0.6 : 1;
   const speed = Math.abs(k.speed);
-  if (k.drifting && speed > 6) {
+  // Tyre marks while drifting, braking hard or spinning out.
+  if (high() && !k.air && (k.drifting || k.spin > 0 || (k.input.brake && speed > 12)) && speed > 5) {
+    k.skidT = (k.skidT || 0) - dt;
+    if (k.skidT <= 0) {
+      k.skidT = 0.035;
+      for (const sx of [-1.05, 1.05]) {
+        const p = k.toWorld(sx * sc, 0, -0.95 * sc);
+        skids.add(p.x, p.z, Math.atan2(k.vx, k.vz), race.time, k.y);
+      }
+    }
+  }
+  if (k.drifting && speed > 6 && !k.air) {
     const tier = k.driftTier();
     const color = tier >= 0 ? DRIFT_TIERS[tier].color : 0xfff2b0;
     for (const sx of [-1.05, 1.05]) {
@@ -796,7 +852,7 @@ function emitKartFx(k, dt) {
       if (per(14)) fx.smoke(p.x, 0.3, p.z, k.vx, k.vz);
     }
   }
-  if (k.offroad && speed > 4) {
+  if (k.offroad && speed > 4 && !k.air) {
     for (const sx of [-1, 1]) {
       const p = k.toWorld(sx * sc, 0.2, -0.9 * sc);
       if (per(18)) fx.dust(p.x, p.y, p.z, race.track.theme.dust, k.vx, k.vz);
@@ -808,8 +864,8 @@ function emitKartFx(k, dt) {
       if (per(60)) fx.flame(p.x, p.y, p.z, -fwdX * 8 + k.vx * 0.5, -fwdZ * 8 + k.vz * 0.5, true);
     }
   }
-  if (k.star > 0 && per(40)) fx.sparkle(k.x, 1.2, k.z, new THREE.Color().setHSL(Math.random(), 1, 0.6).getHex());
-  if (k.spin > 0 && per(20)) fx.smoke(k.x, 0.6, k.z, 0, 0, 0xffffff, 0.3);
+  if (k.star > 0 && per(40)) fx.sparkle(k.x, k.y + 1.2, k.z, new THREE.Color().setHSL(Math.random(), 1, 0.6).getHex());
+  if (k.spin > 0 && per(20)) fx.smoke(k.x, k.y + 0.6, k.z, 0, 0, 0xffffff, 0.3);
 }
 
 // One engine voice per human player, panned toward their part of the screen.
@@ -899,15 +955,15 @@ function showResults() {
   lastResults = { t: 'results', rows, captain: captainPid() };
   sendTo('*', lastResults);
   audio.sfx('cheer', 1.2);
-  fx.confetti(r.order[0].x, 0, r.order[0].z, 120);
+  fx.confetti(r.order[0].x, r.order[0].y, r.order[0].z, 120);
 }
 
 // ---------------------------------------------------------------- cameras + render
 const tmpV = new THREE.Vector3();
 const tmpL = new THREE.Vector3();
 function snapCamera(cam, k) {
-  cam.position.set(k.x - k.forwardX * 7.5, 3.4, k.z - k.forwardZ * 7.5);
-  cam.lookAt(k.x + k.forwardX * 4, 1.2, k.z + k.forwardZ * 4);
+  cam.position.set(k.x - k.forwardX * 7.5, k.y + 3.4, k.z - k.forwardZ * 7.5);
+  cam.lookAt(k.x + k.forwardX * 4, k.y + 1.2, k.z + k.forwardZ * 4);
 }
 
 const ease = (t) => t * t * (3 - 2 * t);
@@ -923,7 +979,7 @@ function updateCamera(cam, k, dt, r) {
     follow = 60;
   }
   const h = k.heading + Math.PI - angle;
-  tmpV.set(k.x - Math.sin(h) * back, up, k.z - Math.cos(h) * back);
+  tmpV.set(k.x - Math.sin(h) * back, k.y + up, k.z - Math.cos(h) * back);
   cam.position.lerp(tmpV, 1 - Math.exp(-dt * follow));
   // Shake after hits and wall bonks.
   if (k.shake > 0) {
@@ -932,7 +988,7 @@ function updateCamera(cam, k, dt, r) {
     cam.position.x += (Math.random() - 0.5) * a;
     cam.position.y += (Math.random() - 0.5) * a;
   }
-  tmpL.set(k.x + k.forwardX * 4, 1.2, k.z + k.forwardZ * 4);
+  tmpL.set(k.x + k.forwardX * 4, k.y + 1.2, k.z + k.forwardZ * 4);
   cam.lookAt(tmpL);
   // Lean into drifts a little.
   cam.rotateZ(k.drifting ? k.driftDir * 0.04 : 0);
@@ -941,14 +997,35 @@ function updateCamera(cam, k, dt, r) {
   cam.updateProjectionMatrix();
 }
 
+// Point rendering at one screen rectangle, either on the HDR post target or
+// straight on screen (Low graphics). three.js viewport origin is bottom-left.
+function setRect(r) {
+  if (high()) {
+    const t = post.target, pr = renderer.getPixelRatio();
+    t.viewport.set(r.x * pr, (H - r.y - r.h) * pr, r.w * pr, r.h * pr);
+    t.scissor.copy(t.viewport);
+    t.scissorTest = true;
+    renderer.setRenderTarget(t);
+  } else {
+    renderer.setRenderTarget(null);
+    renderer.setViewport(r.x, H - r.y - r.h, r.w, r.h);
+    renderer.setScissor(r.x, H - r.y - r.h, r.w, r.h);
+  }
+}
+
+const camDir = new THREE.Vector3();
 function renderView(cam, r) {
-  // three.js viewport origin is bottom-left.
-  renderer.setViewport(r.x, H - r.y - r.h, r.w, r.h);
-  renderer.setScissor(r.x, H - r.y - r.h, r.w, r.h);
   cam.aspect = r.w / r.h;
   cam.updateProjectionMatrix();
   sky.follow(cam);
   fx.setViewport(cam, r.h);
+  // Shadow box centred a little ahead of this camera.
+  cam.getWorldDirection(camDir);
+  const tx = cam.position.x + camDir.x * 30, tz = cam.position.z + camDir.z * 30;
+  sun.target.position.set(tx, 0, tz);
+  sun.position.set(tx + sunDir.x * 160, sunDir.y * 160, tz + sunDir.z * 160);
+  sun.target.updateMatrixWorld();
+  setRect(r);
   renderer.render(scene, cam);
 }
 
@@ -966,15 +1043,25 @@ function renderLobby(dt) {
   lobbyS = (lobbyS + (dt * 9) / cl.seg) % cl.n;
   const p = cl.pointAt(lobbyS, Math.sin(lobbyS / 60) * 6);
   const a = cl.pointAt(lobbyS + 22 / cl.seg, 0);
-  lobbyCam.position.set(p.x, 9 + Math.sin(lobbyS / 40) * 3, p.z);
-  lobbyCam.lookAt(a.x, 2, a.z);
-  fx.ambient(dt, p.x, p.z, track.theme.weather);
+  lobbyCam.position.set(p.x, p.y + 9 + Math.sin(lobbyS / 40) * 3, p.z);
+  lobbyCam.lookAt(a.x, a.y + 2, a.z);
+  fx.ambient(dt, p.x, p.z, track.theme.weather, p.y);
   renderView(lobbyCam, { x: 0, y: 0, w: W, h: H });
 }
 
 const overviewCam = new THREE.PerspectiveCamera(60, 1, 0.5, 1500);
 let orbit = 0;
 function render(dt) {
+  wind.value = performance.now() / 1000;
+  skids.update(race ? race.time : 0);
+  const views = race && race.phase !== 'results' ? race.humanKarts.length : 0;
+  const cells = layout(Math.max(1, views), W, H);
+  post.setViews(Math.round(W / cells[0].w), Math.round(H / cells[0].h));
+  drawFrame(dt);
+  if (high()) post.finish();
+}
+
+function drawFrame(dt) {
   hud.clearRect(0, 0, W, H);
   sky.update(dt);
   fx.update(dt);
@@ -991,16 +1078,16 @@ function render(dt) {
     // Orbit the winner.
     const lead = r.order[0];
     orbit += dt * 0.35;
-    overviewCam.position.set(lead.x + Math.cos(orbit) * 11, 4.5, lead.z + Math.sin(orbit) * 11);
-    overviewCam.lookAt(lead.x, 1, lead.z);
-    fx.ambient(dt, lead.x, lead.z, track.theme.weather);
+    overviewCam.position.set(lead.x + Math.cos(orbit) * 11, lead.y + 4.5, lead.z + Math.sin(orbit) * 11);
+    overviewCam.lookAt(lead.x, lead.y + 1, lead.z);
+    fx.ambient(dt, lead.x, lead.z, track.theme.weather, lead.y);
     renderView(overviewCam, { x: 0, y: 0, w: W, h: H });
     return;
   }
   const rects = layout(views.length, W, H);
   views.forEach((k, i) => {
     updateCamera(r.cams[i], k, dt, r);
-    if (i < 4) fx.ambient(dt / Math.min(views.length, 4), k.x, k.z, track.theme.weather);
+    if (i < 4) fx.ambient(dt / Math.min(views.length, 4), k.x, k.z, track.theme.weather, k.y);
     // Name tags only for nearby rivals, so distant packs don't turn into a pile of labels.
     for (const o of r.karts) o.model.tag.visible = o !== k && (o.x - k.x) ** 2 + (o.z - k.z) ** 2 < 70 * 70;
     renderView(r.cams[i], rects[i]);
@@ -1010,7 +1097,7 @@ function render(dt) {
   // Spare cell (3, 5, 7 players) shows the map + standings; otherwise a corner minimap.
   if (rects.length > views.length) {
     const spare = rects[views.length];
-    renderer.setScissor(spare.x, H - spare.y - spare.h, spare.w, spare.h);
+    setRect(spare);
     renderer.setClearColor(0x10132e);
     renderer.clear();
     drawMinimap(hud, { x: spare.x, y: spare.y, w: spare.w * 0.6, h: spare.h }, r.track, r.karts);

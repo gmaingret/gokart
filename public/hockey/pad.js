@@ -103,6 +103,11 @@ function onMsg(m) {
     case 'fx':
       onFx(m.k);
       break;
+    case 'k':
+      // TV heartbeat: answer at once (it measures our ping and keeps Wi-Fi awake).
+      send({ t: 'ka', ts: m.ts });
+      if (m.r !== null && m.r !== undefined) $('pPing').textContent = `📶 ${m.r} ms`;
+      break;
     case 'switch':
       // The TV changed game: follow it.
       location.href = m.url;
@@ -252,8 +257,9 @@ function drawPad() {
 function loop(now) {
   if (!$('sPlay').classList.contains('hidden')) {
     drawPad();
-    // ~60 updates a second while the finger moves.
-    if (dirty && now - lastSend > 15) {
+    // ~60 updates a second while the finger moves, and a steady 30 a second
+    // otherwise so the phone's Wi-Fi never dozes off mid-rally.
+    if ((dirty && now - lastSend > 15) || now - lastSend > 33) {
       send({ t: 'p', x: +pos.u.toFixed(4), y: +pos.v.toFixed(4) });
       dirty = false;
       lastSend = now;

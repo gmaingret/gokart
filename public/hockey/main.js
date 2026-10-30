@@ -2,6 +2,7 @@ import * as audio from '../tv/audio.js';
 import { Table, HX, HZ } from './table.js';
 import { createBot, driveBot, LEVELS } from './ai.js';
 import { HockeyScene, COLORS } from './scene.js';
+import { createNetStat } from '../shared/netstat.js';
 
 // Air hockey on the TV: two phones are the mallets (or one phone vs the CPU).
 // Phones send their finger position on their half of the table; the TV runs
@@ -71,6 +72,7 @@ function connect() {
     setTimeout(connect, 1500);
   };
 }
+const net = createNetStat((pid, m) => sendTo(pid, m), () => players.values());
 function sendTo(pid, m) {
   if (pid === 'kb') return;
   if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'to', pid, m }));
@@ -112,6 +114,9 @@ function onPlayer(p, m) {
   if (!p || !m) return;
   const captain = p.pid === captainPid();
   switch (m.t) {
+    case 'ka':
+      net.pong(p, m);
+      break;
     case 'hello':
       if (typeof m.name === 'string' && m.name.trim()) p.name = m.name.trim().slice(0, 12);
       changed();
@@ -470,6 +475,7 @@ function frame(now) {
     acc -= STEP;
   }
   view.render(table, dt, phase === 'lobby' ? 'lobby' : 'match');
+  net.frame(dt);
   requestAnimationFrame(frame);
 }
 

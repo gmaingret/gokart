@@ -194,6 +194,10 @@ function onMsg(m) {
     case 'results':
       showResults(m);
       break;
+    case 'k':
+      // TV heartbeat: answer at once (it measures our ping and keeps Wi-Fi awake).
+      send({ t: 'ka', ts: m.ts });
+      break;
     case 'switch':
       // The TV changed game: follow it.
       location.href = m.url;
@@ -301,7 +305,7 @@ function pushInput(force = false) {
 }
 setInterval(() => {
   if (!$('sRace').classList.contains('hidden')) pushInput(true);
-}, 120);
+}, 50);
 
 // Generic hold button supporting multi-touch.
 function holdButton(el, onChange) {

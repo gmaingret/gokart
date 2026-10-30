@@ -14,6 +14,7 @@ import { Hazards } from './hazards.js';
 import { driveBot, botSpeedMult, driveBattle } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
 import * as audio from './audio.js';
+import { createNetStat } from '../shared/netstat.js';
 
 const CC = {
   50: { maxSpeed: 19, accel: 13, skill: 0.35, bot: 0.86 },
@@ -170,6 +171,7 @@ function connect() {
   };
 }
 
+const net = createNetStat((pid, m) => sendTo(pid, m), () => players.values());
 function sendTo(pid, m) {
   if (pid === 'kb') return;
   if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'to', pid, m }));
@@ -227,6 +229,9 @@ function onPlayer(p, m) {
   if (!p || !m) return;
   const isCaptain = p.pid === captainPid();
   switch (m.t) {
+    case 'ka':
+      net.pong(p, m);
+      break;
     case 'hello':
       if (typeof m.name === 'string' && m.name.trim()) p.name = m.name.trim().slice(0, 12);
       if (Number.isInteger(m.driver) && m.driver >= 0 && m.driver < DRIVERS.length && !driverTaken(m.driver, p)) p.driver = m.driver;
@@ -1141,6 +1146,7 @@ function frame(now) {
     if (steps === 6) acc = 0;
   }
   render(dt);
+  net.frame(dt);
   requestAnimationFrame(frame);
 }
 

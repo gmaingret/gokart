@@ -15,6 +15,7 @@ import { driveBot, botSpeedMult, driveBattle } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
 import * as audio from './audio.js';
 import { createNetStat } from '../shared/netstat.js';
+import { switchGame } from '../shared/games.js';
 
 const CC = {
   50: { maxSpeed: 19, accel: 13, skill: 0.35, bot: 0.86 },
@@ -290,7 +291,7 @@ let focusRow = START_ROW;
 
 function changeCfg(k, dir) {
   dir = Math.sign(dir) || 1;
-  if (k === 'game') return switchGame();
+  if (k === 'game') return switchGame('kart', dir, (m) => sendTo('*', m), 'gokart.room');
   if (k === 'mode') cfg.mode = cfg.mode === 'race' ? 'battle' : 'race';
   if (k === 'track') cfg.track = (cfg.track + dir + TRACKS.length) % TRACKS.length;
   if (k === 'laps') cfg.laps = Math.max(1, Math.min(7, cfg.laps + dir));
@@ -309,13 +310,6 @@ function changeCfg(k, dir) {
   audio.sfx('menu');
   loadTrack(cfg.track);
   lobbyChanged();
-}
-
-// Over to Air Hockey, taking the phones along.
-function switchGame() {
-  sendTo('*', { t: 'switch', url: '/hockey/play?auto=1' });
-  sessionStorage.removeItem('gokart.room');
-  setTimeout(() => (location.href = '/hockey/'), 150);
 }
 
 function connectedPlayers() {

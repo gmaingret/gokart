@@ -32,7 +32,33 @@ and **phones on the same Wi-Fi are the controllers** — no app to install, no g
 - Phones vibrate when you get hit, grab an item or boost (Android)
 - Drop-in reconnects: a phone or the TV can reload mid-race and pick up where it was
 
-## Quick start
+## More games on the same server
+
+Every TV lobby has a **Game** row, so the TV remote can switch between all four games; phones
+that are already connected follow automatically.
+
+### Air Hockey 🏒
+
+`/hockey` on the TV. Two players, one per phone, or one phone against the CPU (Easy / Normal /
+Hard). **Your phone screen is your half of the table**, laid out exactly as on the TV: put your
+finger where you want your mallet and slide. First to 5, 7 or 10 goals; a third phone plays the winner.
+
+### Ice Sumo 🥋
+
+`/sumo` on the TV. Up to 4 round little wrestlers (phones, topped up with CPUs) on a ring of ice
+that keeps shrinking. Slide with the joystick; hold **DASH** to charge and let go to shove. Last
+one standing wins the round; first to 2, 3 or 5 rounds is Yokozuna.
+
+### Kitchen Rush 🍳
+
+`/cook` on the TV. A co-op cooking game for 1–4 chefs (best with 2). Orders come in as tickets:
+grab ingredients from the crates, chop them (hold **CHOP** at a board), put patties on the stove
+(and take them off before they burn), plate up and serve at the window before the ticket runs
+out. Salads, burgers, deluxe and veggie burgers; 2–4 minute shifts, 0–3 stars.
+
+The TV pages show fps and each phone's network delay in the bottom-left corner.
+
+
 
 You need [Node.js](https://nodejs.org) 18+ on any computer on your home network
 (laptop, desktop, Raspberry Pi…).
@@ -132,7 +158,11 @@ server.js              HTTP + WebSocket server, QR code endpoint
 src/relay.js           room / player message relay
 public/tv/             TV game (main loop, track builder, kart physics, items, AI, HUD, audio)
 public/controller/     phone controller
-public/shared/         data shared by both (drivers, items, points)
+public/shared/         shared data (drivers, items, points), game list, party lobby (party-tv),
+                       joystick pad for Sumo / Kitchen, network readout
+public/hockey/         Air Hockey: TV page (main, scene), physics (table), CPU (ai), phone pad (pad)
+public/sumo/           Ice Sumo: TV page, physics + CPU (arena), 3D scene
+public/cook/           Kitchen Rush: TV page, rules (kitchen), 3D scene, food icons
 test/                  node:test unit tests
 ```
 

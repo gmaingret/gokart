@@ -3,6 +3,7 @@ import { Table, HX, HZ } from './table.js';
 import { createBot, driveBot, LEVELS } from './ai.js';
 import { HockeyScene, COLORS } from './scene.js';
 import { createNetStat } from '../shared/netstat.js';
+import { switchGame } from '../shared/games.js';
 
 // Air hockey on the TV: two phones are the mallets (or one phone vs the CPU).
 // Phones send their finger position on their half of the table; the TV runs
@@ -177,7 +178,7 @@ let focusRow = START_ROW;
 
 function changeCfg(k, dir) {
   dir = Math.sign(dir) || 1;
-  if (k === 'game') return switchGame();
+  if (k === 'game') return switchGame('hockey', dir, (m) => sendTo('*', m), 'hockey.room');
   if (k === 'points') cfg.points = POINTS[(POINTS.indexOf(cfg.points) + dir + POINTS.length) % POINTS.length];
   if (k === 'cpu') cfg.cpu = Math.max(0, Math.min(LEVELS.length - 1, cfg.cpu + dir));
   if (k === 'gfx') {
@@ -191,12 +192,6 @@ function changeCfg(k, dir) {
   changed();
 }
 
-// Back to GoKart, taking the phones along.
-function switchGame() {
-  sendTo('*', { t: 'switch', url: '/play?auto=1' });
-  sessionStorage.removeItem('hockey.room');
-  setTimeout(() => (location.href = '/'), 150);
-}
 
 function renderLobby() {
   const cap = captainPid();

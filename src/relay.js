@@ -66,7 +66,7 @@ export function createRelay({ random = Math.random } = {}) {
   function onJoin(ws, msg) {
     let code = msg.code ? String(msg.code).toUpperCase().trim() : '';
     const game = gameOf(msg.game);
-    const title = game === 'hockey' ? 'Air Hockey' : 'GoKart';
+    const title = { hockey: 'Air Hockey', sumo: 'Ice Sumo', cook: 'Kitchen Rush' }[game] || 'GoKart';
     if (!code) {
       // No code typed: pick the only room of this game whose TV is online (rooms
       // whose TV just closed linger for HOST_GRACE_MS and shouldn't block this).

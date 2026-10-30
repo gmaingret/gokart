@@ -196,7 +196,7 @@ function onMsg(m) {
       break;
     case 'k':
       // TV heartbeat: answer at once (it measures our ping and keeps Wi-Fi awake).
-      send({ t: 'ka', ts: m.ts });
+      send({ t: 'ka', ts: m.ts, tp: performance.now() });
       break;
     case 'switch':
       // The TV changed game: follow it.
@@ -300,7 +300,7 @@ function pushInput(force = false) {
   const msg = JSON.stringify(input);
   if (force || msg !== lastSent) {
     lastSent = msg;
-    send({ t: 'in', ...input });
+    send({ t: 'in', ...input, tp: performance.now() });
   }
 }
 setInterval(() => {

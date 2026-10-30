@@ -169,10 +169,32 @@ export function createRelay({ random = Math.random } = {}) {
   return {
     attach(ws) {
       ws.isAlive = true;
-      ws.on('pong', () => (ws.isAlive = true));
+      ws.on('pong', (data) => {
+        ws.isAlive = true;
+        // Our measuring pings carry their send time (keep-alive pings don't).
+        const sent = Number(data?.toString());
+        if (sent > 0) ws.lat = Date.now() - sent;
+      });
       ws.on('message', (d) => onMessage(ws, d.toString()));
       ws.on('close', () => onClose(ws));
       ws.on('error', () => {});
+    },
+    // Ping every TV and phone, and tell each TV the latest times (in ms) for
+    // itself and its phones, so it can show which leg of the trip is slow.
+    measure() {
+      const ping = (ws) => {
+        if (ws?.readyState === 1) ws.ping(String(Date.now()));
+      };
+      for (const room of rooms.values()) {
+        if (!room.host || room.host.readyState !== 1) continue;
+        const p = {};
+        for (const [pid, pl] of room.players) {
+          if (pl.ws?.lat !== undefined) p[pid] = pl.ws.lat;
+          ping(pl.ws);
+        }
+        send(room.host, { t: 'lat', tv: room.host.lat ?? null, p });
+        ping(room.host);
+      }
     },
     roomCodes: () => [...rooms.keys()],
     _rooms: rooms,

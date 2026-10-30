@@ -132,6 +132,7 @@ setInterval(() => {
     ws.ping();
   }
 }, 5000).unref();
+setInterval(() => relay.measure(), 1000).unref();
 
 server.listen(PORT, '0.0.0.0', () => {
   const addrs = lanAddresses();

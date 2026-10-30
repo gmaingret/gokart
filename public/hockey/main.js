@@ -107,6 +107,9 @@ function onServer(msg) {
     case 'from':
       onPlayer(players.get(msg.pid), msg.m);
       break;
+    case 'lat':
+      net.server(msg, players);
+      break;
   }
 }
 
@@ -122,6 +125,7 @@ function onPlayer(p, m) {
       changed();
       break;
     case 'p':
+      net.input(p, m.tp);
       p.u = Math.max(0, Math.min(1, Number(m.x) || 0));
       p.v = Math.max(0, Math.min(1, Number(m.y) || 0));
       break;

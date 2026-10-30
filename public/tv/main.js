@@ -212,6 +212,9 @@ function onServer(msg) {
     case 'from':
       onPlayer(players.get(msg.pid), msg.m);
       break;
+    case 'lat':
+      net.server(msg, players);
+      break;
   }
 }
 
@@ -247,6 +250,7 @@ function onPlayer(p, m) {
       }
       break;
     case 'in': {
+      net.input(p, m.tp);
       const i = p.input;
       i.steer = Math.max(-1, Math.min(1, Number(m.s) || 0));
       i.gas = !!m.g;

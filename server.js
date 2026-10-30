@@ -76,6 +76,8 @@ const server = http.createServer(async (req, res) => {
 
   if (p === '/' || p === '/tv' || p === '/tv/') return sendFile(res, path.join(PUBLIC_DIR, 'tv', 'index.html'));
   if (p === '/play' || p === '/play/' || p === '/p') return sendFile(res, path.join(PUBLIC_DIR, 'controller', 'index.html'));
+  if (p === '/hockey' || p === '/hockey/') return sendFile(res, path.join(PUBLIC_DIR, 'hockey', 'index.html'));
+  if (p === '/hockey/play' || p === '/hockey/play/') return sendFile(res, path.join(PUBLIC_DIR, 'hockey', 'pad.html'));
 
   if (p === '/api/info') {
     const body = JSON.stringify({ port: PORT, publicUrl: PUBLIC_URL || null, addresses: lanAddresses(), rooms: relay.roomCodes() });
@@ -136,7 +138,8 @@ server.listen(PORT, '0.0.0.0', () => {
   const base = PUBLIC_URL || `http://${addrs[0]?.address || 'localhost'}:${PORT}`;
   console.log('\n  GoKart is running!\n');
   console.log(`  TV  : open  ${base}/   in the TV browser`);
-  console.log(`  Phone: open ${base}/play  (or scan the QR code on the TV)\n`);
+  console.log(`  Phone: open ${base}/play  (or scan the QR code on the TV)`);
+  console.log(`  Air Hockey: open ${base}/hockey on the TV\n`);
   if (!PUBLIC_URL && addrs.length > 1) {
     console.log('  Other addresses: ' + addrs.slice(1).map((a) => `${a.address} (${a.name})`).join(', ') + '\n');
   }

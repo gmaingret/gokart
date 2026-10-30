@@ -105,3 +105,37 @@ test('a reloaded TV reclaims its room and phones are told', () => {
   assert.equal(tv2.last('join').pid, 1);
   assert.equal(a.last().t, 'hostback');
 });
+
+test('rooms are per game: a phone without a code finds the TV of its own game', () => {
+  const relay = createRelay();
+  const kartTv = new FakeWs();
+  const hockeyTv = new FakeWs();
+  relay.attach(kartTv);
+  relay.attach(hockeyTv);
+  kartTv.msg({ t: 'host' });
+  hockeyTv.msg({ t: 'host', game: 'hockey' });
+  const kartCode = kartTv.last('room').code;
+  const hockeyCode = hockeyTv.last('room').code;
+  const phone = (game, code = '') => {
+    const ws = new FakeWs();
+    relay.attach(ws);
+    ws.msg({ t: 'join', code, cid: Math.random().toString(36), name: 'P', game });
+    return ws;
+  };
+  assert.equal(phone('hockey').last('joined').code, hockeyCode);
+  assert.equal(phone(undefined).last('joined').code, kartCode);
+  // A code for the other game is refused rather than joining the wrong TV.
+  assert.equal(phone('hockey', kartCode).last().t, 'error');
+});
+
+test('a phone following a game switch waits for a live TV instead of a closed room', () => {
+  const relay = createRelay();
+  const tv = new FakeWs();
+  relay.attach(tv);
+  tv.msg({ t: 'host' });
+  tv.close(); // the TV left (its room lingers for a while)
+  const ws = new FakeWs();
+  relay.attach(ws);
+  ws.msg({ t: 'join', code: '', cid: 'x', name: 'P', live: true });
+  assert.equal(ws.last().t, 'error');
+});

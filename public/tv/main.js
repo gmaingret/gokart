@@ -275,12 +275,13 @@ function freeDriver() {
 }
 
 // ---------------------------------------------------------------- lobby UI
-const ROWS = ['mode', 'track', 'laps', 'cc', 'bots', 'gfx', 'start'];
+const ROWS = ['game', 'mode', 'track', 'laps', 'cc', 'bots', 'gfx', 'start'];
 const START_ROW = ROWS.indexOf('start');
 let focusRow = START_ROW;
 
 function changeCfg(k, dir) {
   dir = Math.sign(dir) || 1;
+  if (k === 'game') return switchGame();
   if (k === 'mode') cfg.mode = cfg.mode === 'race' ? 'battle' : 'race';
   if (k === 'track') cfg.track = (cfg.track + dir + TRACKS.length) % TRACKS.length;
   if (k === 'laps') cfg.laps = Math.max(1, Math.min(7, cfg.laps + dir));
@@ -299,6 +300,13 @@ function changeCfg(k, dir) {
   audio.sfx('menu');
   loadTrack(cfg.track);
   lobbyChanged();
+}
+
+// Over to Air Hockey, taking the phones along.
+function switchGame() {
+  sendTo('*', { t: 'switch', url: '/hockey/play?auto=1' });
+  sessionStorage.removeItem('gokart.room');
+  setTimeout(() => (location.href = '/hockey/'), 150);
 }
 
 function connectedPlayers() {

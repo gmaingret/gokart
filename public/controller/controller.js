@@ -39,7 +39,10 @@ let wantJoin = false;
 const params = new URLSearchParams(location.search);
 const urlRoom = (params.get('room') || '').toUpperCase();
 $('name').value = store.get('name', '');
-$('code').value = urlRoom || store.get('code', '');
+// Arriving from another game (auto=1) the old room code is stale: let the server pick.
+const autoJoin = !!params.get('auto');
+let joinRetries = 0;
+$('code').value = urlRoom || (autoJoin ? '' : store.get('code', ''));
 if (urlRoom) $('codeField').classList.add('hidden');
 
 // ---------------------------------------------------------------- screens
@@ -138,7 +141,7 @@ function connect() {
 function doJoin() {
   const name = $('name').value.trim() || 'Player';
   const code = ($('code').value || '').trim().toUpperCase();
-  send({ t: 'join', code, cid, name });
+  send({ t: 'join', code, cid, name, live: autoJoin });
 }
 
 function hello() {
@@ -156,6 +159,11 @@ function onMsg(m) {
       if (status.phase === 'lobby') show('sLobby');
       break;
     case 'error':
+      // Sent over from Air Hockey, the GoKart TV may still be loading: keep trying.
+      if (autoJoin && !joined && joinRetries++ < 20) {
+        setTimeout(doJoin, 1000);
+        return;
+      }
       $('joinErr').textContent = m.msg;
       wantJoin = false;
       joined = false;
@@ -185,6 +193,10 @@ function onMsg(m) {
       break;
     case 'results':
       showResults(m);
+      break;
+    case 'switch':
+      // The TV changed game: follow it.
+      location.href = m.url;
       break;
   }
 }
@@ -495,3 +507,7 @@ setMeColor();
 refresh();
 applyOpts();
 connect();
+if (autoJoin && $('name').value.trim()) {
+  wantJoin = true;
+  keepAwake();
+}

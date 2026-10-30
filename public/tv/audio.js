@@ -221,6 +221,47 @@ export function sfx(name, arg) {
       osc('square', 1900, t, 0.1, { vol: 0.04, filter: { type: 'bandpass', freq: 2200, q: 8 } });
       osc('square', 2140, t, 0.12, { vol: 0.04, filter: { type: 'bandpass', freq: 2300, q: 8 } });
       break;
+    // Air hockey: puck off a mallet / a rail (arg = 0..1 strength), and a goal horn.
+    case 'puck': {
+      const k = Math.min(1, arg ?? 0.5);
+      noise(t, 0.025, { vol: 0.25 + k * 0.4, type: 'bandpass', freq: 2200 + k * 1800, q: 1.5 });
+      osc('sine', 700 + k * 500, t, 0.05, { vol: 0.12 + k * 0.2, slide: -300, decay: 0.04, sustain: 0.05 });
+      break;
+    }
+    case 'rail': {
+      const k = Math.min(1, arg ?? 0.5);
+      noise(t, 0.04, { vol: 0.15 + k * 0.3, type: 'bandpass', freq: 900 + k * 600, q: 2 });
+      osc('triangle', 220 + k * 80, t, 0.08, { vol: 0.1 + k * 0.15, slide: -60 });
+      break;
+    }
+    case 'splash':
+      noise(t, 0.7, { vol: 0.45, type: 'lowpass', freq: 1800, to: 200 });
+      noise(t + 0.05, 0.4, { vol: 0.2, type: 'bandpass', freq: 600, q: 0.7 });
+      for (let i = 0; i < 6; i++) osc('sine', 500 + Math.random() * 900, t + 0.15 + i * 0.07, 0.06, { vol: 0.06, slide: 500 });
+      break;
+    case 'whoosh':
+      noise(t, 0.3, { vol: 0.3, freq: 600, to: 3000, q: 1.2 });
+      break;
+    case 'chop':
+      noise(t, 0.04, { vol: 0.35, type: 'highpass', freq: 2500 });
+      osc('triangle', 380, t, 0.04, { vol: 0.15, slide: -150 });
+      break;
+    case 'ding':
+      bell(1568, t, 0.16);
+      bell(2093, t + 0.12, 0.14);
+      break;
+    case 'buzz':
+      osc('square', 110, t, 0.35, { vol: 0.08, filter: { freq: 900 } });
+      osc('square', 116, t, 0.35, { vol: 0.08, filter: { freq: 900 } });
+      break;
+    case 'goal':
+      [55, 59, 62, 67].forEach((m) => {
+        osc('sawtooth', midiHz(m), t, 0.9, { vol: 0.07, attack: 0.02, decay: 0.2, sustain: 0.8, release: 0.3, filter: { freq: 2400 } });
+        osc('square', midiHz(m + 12), t, 0.9, { vol: 0.03, attack: 0.02, release: 0.3, filter: { freq: 3000 } });
+      });
+      noise(t, 0.6, { vol: 0.25, type: 'lowpass', freq: 3000, to: 300 });
+      sfx('cheer', 1.2);
+      break;
     case 'pad':
       noise(t, 0.4, { vol: 0.2, freq: 1500, to: 5000, q: 2 });
       osc('square', 600, t, 0.25, { vol: 0.06, slide: 900, filter: { freq: 3000 } });
@@ -374,6 +415,7 @@ const SCALES = {
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
   phrygian: [0, 1, 3, 5, 7, 8, 10],
   hijaz: [0, 1, 4, 5, 7, 8, 10],
+  hirajoshi: [0, 2, 3, 7, 8],
   minpent: [0, 3, 5, 7, 10],
 };
 
@@ -402,6 +444,12 @@ const SONGS = {
   8: { bpm: 116, root: 57, scale: 'minpent', prog: [0, 0, 3, 0, 2, 3, 0, 0], seed: 151, drums: 'jungle', bass: 'drone', bassInst: 'sine', chords: 'none', arp: { pat: 'updown', inst: 'marimba', vol: 1.3 }, lead: { inst: 'panflute', style: 'long' } },
   // Cosmic Way: trance, rolling off-beat bass and supersaws.
   9: { bpm: 138, root: 61, scale: 'minor', prog: [0, 5, 3, 6], seed: 163, drums: 'trance', bass: 'offbeat', bassInst: 'synth', chords: 'gated', arp: { pat: 'fast', inst: 'sawtooth', vol: 0.3, oct: 2 }, lead: { inst: 'supersaw', style: 'long' } },
+  // Air hockey: driving electro.
+  hockey: { bpm: 124, root: 57, scale: 'minor', prog: [0, 5, 2, 6, 0, 5, 3, 4], seed: 211, drums: 'synthwave', bass: 'offbeat', bassInst: 'synth', chords: 'gated', arp: { pat: 'up', inst: 'sawtooth', vol: 0.4 }, lead: { inst: 'synthlead', style: 'long', vol: 0.8 } },
+  // Ice Sumo: taiko drums and a koto-like pluck.
+  sumo: { bpm: 112, root: 57, scale: 'hirajoshi', prog: [0, 0, 3, 0, 2, 2, 3, 4], seed: 307, drums: 'jungle', bass: 'drone', bassInst: 'sine', chords: 'none', arp: { pat: 'updown', inst: 'pluck', vol: 0.8 }, lead: { inst: 'flute', style: 'long', vol: 0.9 } },
+  // Kitchen Rush: bouncy swing with marimba and steel drums.
+  cook: { bpm: 128, root: 62, scale: 'mixolydian', prog: [0, 3, 4, 3, 0, 5, 4, 0], seed: 401, swing: 0.18, drums: 'chip', bass: 'tuba', bassInst: 'sine', chords: 'stab', arp: { pat: 'up', inst: 'marimba', vol: 1 }, lead: { inst: 'steel', style: 'pop' } },
   lobby: { bpm: 96, root: 65, scale: 'major', prog: [0, 5, 3, 4, 0, 5, 1, 4], seed: 71, drums: 'soft', bass: 'bounce', chords: 'pad', arp: { pat: 'up', inst: 'triangle', vol: 1.4 }, lead: null },
   results: { bpm: 118, root: 60, scale: 'major', prog: [0, 3, 4, 0, 5, 3, 4, 4], seed: 89, drums: 'pop', bass: 'bounce', chords: 'pad', arp: { pat: 'up', inst: 'triangle' }, lead: { inst: 'square', style: 'pop' } },
   star: { bpm: 172, root: 67, scale: 'major', prog: [0, 0, 3, 4], seed: 97, drums: 'four', bass: 'bounce', chords: 'pad', arp: { pat: 'fast', inst: 'triangle' }, lead: { inst: 'square', style: 'pop' } },

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kitchen Rush</title>
+  <link rel="icon" href="/shared/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/tv/tv.css">
+  <link rel="stylesheet" href="/shared/party.css">
+  <style>
+    .brand h1 span { color: #ff8a3d; }
+    #orders { position: fixed; top: 2vh; left: 1.5vw; display: flex; gap: 0.8vw; z-index: 4; pointer-events: none; }
+    .ticket {
+      width: clamp(90px, 9vw, 170px);
+      background: #fffdf5;
+      color: #3a2a1a;
+      border-radius: 10px;
+      padding: 0.6vh 0.5vw 0.8vh;
+      box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+      text-align: center;
+      font-weight: 800;
+      font-size: clamp(11px, 1vw, 18px);
+      animation: drop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+    }
+    @keyframes drop { 0% { transform: translateY(-60px); } 100% { transform: translateY(0); } }
+    .ticket .ic { display: flex; justify-content: center; gap: 2px; margin: 0.4vh 0; }
+    .ticket .ic img { width: 34%; aspect-ratio: 1; }
+    .ticket .main { width: 60%; margin: 0 auto; display: block; }
+    .ticket .tm { height: 0.8vh; min-height: 5px; border-radius: 99px; background: #e0d6c2; overflow: hidden; }
+    .ticket .tm i { display: block; height: 100%; background: #43a047; transition: width 0.2s linear; }
+    .ticket.late .tm i { background: #e53935; }
+    .ticket.late { animation: shake 0.4s infinite; }
+    @keyframes shake { 50% { transform: rotate(-3deg); } }
+    #clock, #scorebox {
+      position: fixed;
+      top: 2vh;
+      z-index: 4;
+      padding: 0.6vh 1.4vw;
+      border-radius: 14px;
+      background: rgba(30, 15, 25, 0.8);
+      font-weight: 900;
+      font-size: clamp(18px, 2.4vw, 44px);
+      pointer-events: none;
+    }
+    #clock { left: 50%; transform: translateX(-50%); }
+    #clock.low { color: #ff6b6b; }
+    #scorebox { right: 1.5vw; color: #ffcf33; }
+    .pop { position: fixed; z-index: 6; font-weight: 900; font-size: clamp(20px, 2.6vw, 48px); color: #ffcf33; text-shadow: 0 3px 0 #000; pointer-events: none; animation: rise 1.2s ease-out forwards; }
+    @keyframes rise { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-80px); opacity: 0; } }
+    #resultsBody .stars { font-size: 3em; letter-spacing: 0.1em; }
+  </style>
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three-addons/" } }
+  </script>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <div id="orders" class="hidden"></div>
+  <div id="clock" class="hidden">3:00</div>
+  <div id="scorebox" class="hidden">0</div>
+  <script type="module" src="/cook/main.js"></script>
+</body>
+</html>

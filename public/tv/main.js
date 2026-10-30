@@ -14,6 +14,8 @@ import { Hazards } from './hazards.js';
 import { driveBot, botSpeedMult, driveBattle } from './ai.js';
 import { layout, drawViewportHud, drawMinimap, drawStandings, drawCountdown } from './hud.js';
 import * as audio from './audio.js';
+import { createNetStat } from '../shared/netstat.js';
+import { switchGame } from '../shared/games.js';
 
 const CC = {
   50: { maxSpeed: 19, accel: 13, skill: 0.35, bot: 0.86 },
@@ -170,6 +172,7 @@ function connect() {
   };
 }
 
+const net = createNetStat((pid, m) => sendTo(pid, m), () => players.values());
 function sendTo(pid, m) {
   if (pid === 'kb') return;
   if (ws?.readyState === 1) ws.send(JSON.stringify({ t: 'to', pid, m }));
@@ -210,6 +213,9 @@ function onServer(msg) {
     case 'from':
       onPlayer(players.get(msg.pid), msg.m);
       break;
+    case 'lat':
+      net.server(msg, players);
+      break;
   }
 }
 
@@ -227,6 +233,9 @@ function onPlayer(p, m) {
   if (!p || !m) return;
   const isCaptain = p.pid === captainPid();
   switch (m.t) {
+    case 'ka':
+      net.pong(p, m);
+      break;
     case 'hello':
       if (typeof m.name === 'string' && m.name.trim()) p.name = m.name.trim().slice(0, 12);
       if (Number.isInteger(m.driver) && m.driver >= 0 && m.driver < DRIVERS.length && !driverTaken(m.driver, p)) p.driver = m.driver;
@@ -242,6 +251,7 @@ function onPlayer(p, m) {
       }
       break;
     case 'in': {
+      net.input(p, m.tp);
       const i = p.input;
       i.steer = Math.max(-1, Math.min(1, Number(m.s) || 0));
       i.gas = !!m.g;
@@ -275,12 +285,13 @@ function freeDriver() {
 }
 
 // ---------------------------------------------------------------- lobby UI
-const ROWS = ['mode', 'track', 'laps', 'cc', 'bots', 'gfx', 'start'];
+const ROWS = ['game', 'mode', 'track', 'laps', 'cc', 'bots', 'gfx', 'start'];
 const START_ROW = ROWS.indexOf('start');
 let focusRow = START_ROW;
 
 function changeCfg(k, dir) {
   dir = Math.sign(dir) || 1;
+  if (k === 'game') return switchGame('kart', dir, (m) => sendTo('*', m), 'gokart.room');
   if (k === 'mode') cfg.mode = cfg.mode === 'race' ? 'battle' : 'race';
   if (k === 'track') cfg.track = (cfg.track + dir + TRACKS.length) % TRACKS.length;
   if (k === 'laps') cfg.laps = Math.max(1, Math.min(7, cfg.laps + dir));
@@ -1133,6 +1144,7 @@ function frame(now) {
     if (steps === 6) acc = 0;
   }
   render(dt);
+  net.frame(dt);
   requestAnimationFrame(frame);
 }
 

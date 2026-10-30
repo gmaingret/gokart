@@ -76,6 +76,13 @@ const server = http.createServer(async (req, res) => {
 
   if (p === '/' || p === '/tv' || p === '/tv/') return sendFile(res, path.join(PUBLIC_DIR, 'tv', 'index.html'));
   if (p === '/play' || p === '/play/' || p === '/p') return sendFile(res, path.join(PUBLIC_DIR, 'controller', 'index.html'));
+  // The other games: /<game>/ on the TV, /<game>/play on the phones.
+  const g = p.match(/^\/(hockey|sumo|cook)(\/play)?\/?$/);
+  if (g) {
+    if (!g[2]) return sendFile(res, path.join(PUBLIC_DIR, g[1], 'index.html'));
+    // Hockey has its own touch pad; the others share the joystick + buttons pad.
+    return sendFile(res, g[1] === 'hockey' ? path.join(PUBLIC_DIR, 'hockey', 'pad.html') : path.join(PUBLIC_DIR, 'shared', 'pad.html'));
+  }
 
   if (p === '/api/info') {
     const body = JSON.stringify({ port: PORT, publicUrl: PUBLIC_URL || null, addresses: lanAddresses(), rooms: relay.roomCodes() });
@@ -130,13 +137,15 @@ setInterval(() => {
     ws.ping();
   }
 }, 5000).unref();
+setInterval(() => relay.measure(), 1000).unref();
 
 server.listen(PORT, '0.0.0.0', () => {
   const addrs = lanAddresses();
   const base = PUBLIC_URL || `http://${addrs[0]?.address || 'localhost'}:${PORT}`;
   console.log('\n  GoKart is running!\n');
   console.log(`  TV  : open  ${base}/   in the TV browser`);
-  console.log(`  Phone: open ${base}/play  (or scan the QR code on the TV)\n`);
+  console.log(`  Phone: open ${base}/play  (or scan the QR code on the TV)`);
+  console.log(`  Other games: ${base}/hockey, ${base}/sumo, ${base}/cook on the TV\n`);
   if (!PUBLIC_URL && addrs.length > 1) {
     console.log('  Other addresses: ' + addrs.slice(1).map((a) => `${a.address} (${a.name})`).join(', ') + '\n');
   }

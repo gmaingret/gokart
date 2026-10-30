@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Air Hockey</title>
+  <link rel="icon" href="/shared/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/tv/tv.css">
+  <link rel="stylesheet" href="/hockey/hockey.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three-addons/" } }
+  </script>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <div id="score" class="hidden">
+    <div class="side left"><span class="nm" id="nameL">—</span><b id="scoreL">0</b></div>
+    <div class="to" id="scoreTo">First to 7</div>
+    <div class="side right"><b id="scoreR">0</b><span class="nm" id="nameR">—</span></div>
+  </div>
+  <div id="banner" class="hidden"><b id="bannerBig"></b><span id="bannerSmall"></span></div>
+
+  <section id="lobby" class="screen">
+    <header class="brand">
+      <h1>Air <span>Hockey</span></h1>
+      <p>Two phones, one puck. Your phone screen is your half of the table: slide your finger to move your mallet.</p>
+    </header>
+    <div class="lobby-grid">
+      <div class="panel join">
+        <img id="qr" alt="QR code to join">
+        <div class="join-url" id="joinUrl">…</div>
+        <div class="join-code">Room code <b id="roomCode">····</b></div>
+      </div>
+      <div class="panel players">
+        <h2>Players</h2>
+        <div class="seats">
+          <div class="seat left" id="seatL"><i></i><span class="nm"></span><small>Left</small></div>
+          <div class="vs">VS</div>
+          <div class="seat right" id="seatR"><i></i><span class="nm"></span><small>Right</small></div>
+        </div>
+        <p class="hint" id="benchHint"></p>
+        <p class="hint">Alone? The CPU takes the other side. The first player to join is the captain.</p>
+      </div>
+      <div class="panel settings" id="settings">
+        <h2>Match setup</h2>
+        <div class="row" data-k="game"><span>Game</span><button class="dec">◀</button><b id="vGame">🏒 Air Hockey</b><button class="inc">▶</button></div>
+        <div class="row" data-k="points"><span>Goals</span><button class="dec">◀</button><b id="vPoints"></b><button class="inc">▶</button></div>
+        <div class="row" data-k="cpu"><span>CPU</span><button class="dec">◀</button><b id="vCpu"></b><button class="inc">▶</button></div>
+        <div class="row" data-k="gfx"><span>Graphics</span><button class="dec">◀</button><b id="vGfx"></b><button class="inc">▶</button></div>
+        <div class="row start" data-k="start"><button id="startBtn">Start match</button></div>
+        <p class="hint">TV remote: ▲▼ choose · ◀▶ change · OK start<br>Keyboard: <kbd>K</kbd> adds a keyboard player (arrow keys)</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="results" class="screen hidden">
+    <h1 id="resultsTitle">Winner!</h1>
+    <p class="final" id="resultsScore"></p>
+    <p class="hint">Captain: tap <b>Play again</b> on your phone (or press OK on the TV)</p>
+  </section>
+
+  <div id="toast"></div>
+  <div id="soundHint">🔈 Click or press OK to turn on sound</div>
+  <div id="conn" class="hidden">Reconnecting to the server…</div>
+
+  <script type="module" src="/hockey/main.js"></script>
+</body>
+</html>

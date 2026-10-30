@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#05060f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="/shared/icon.svg" type="image/svg+xml">
+  <title>Air Hockey Controller</title>
+  <link rel="stylesheet" href="/hockey/pad.css">
+</head>
+<body>
+  <div id="banner" class="hidden"></div>
+
+  <section id="sJoin" class="screen center">
+    <h1 class="logo">Air <span>Hockey</span></h1>
+    <label class="field">Your name
+      <input id="name" maxlength="12" autocomplete="nickname" placeholder="Player" enterkeyhint="go">
+    </label>
+    <label class="field" id="codeField">Room code <small>(shown on the TV)</small>
+      <input id="code" maxlength="4" autocapitalize="characters" placeholder="ABCD">
+    </label>
+    <button id="joinBtn" class="big">Join</button>
+    <p class="err" id="joinErr"></p>
+  </section>
+
+  <section id="sLobby" class="screen center hidden">
+    <div class="seatcard" id="seatCard"><i></i><div><b id="seatTitle"></b><span id="seatSub"></span></div></div>
+    <p class="vsline" id="vsLine"></p>
+    <div id="captainBox" class="hidden">
+      <div class="cfg" data-k="points"><span>First to</span><button data-d="-1">◀</button><b id="cPoints"></b><button data-d="1">▶</button></div>
+      <div class="cfg" data-k="cpu"><span>CPU</span><button data-d="-1">◀</button><b id="cCpu"></b><button data-d="1">▶</button></div>
+      <div class="row2">
+        <button id="swapBtn" class="ghost">⇄ Swap sides</button>
+        <button id="startBtn" class="big">START!</button>
+      </div>
+    </div>
+    <p id="waitText" class="small">Waiting for the captain to start…</p>
+  </section>
+
+  <section id="sPlay" class="hidden">
+    <canvas id="pad"></canvas>
+    <div class="hudbar"><b id="pScoreMe">0</b><span id="pInfo"></span><b id="pScoreThem">0</b><span id="pPing"></span></div>
+  </section>
+
+  <section id="sOver" class="screen center hidden">
+    <h1 id="overTitle"></h1>
+    <p class="final" id="overScore"></p>
+    <div id="overCaptain" class="row2 hidden">
+      <button id="lobbyBtn" class="ghost">Lobby</button>
+      <button id="againBtn" class="big">Play again</button>
+    </div>
+    <p id="overWait" class="small">Waiting for the captain…</p>
+  </section>
+
+  <script type="module" src="/hockey/pad.js"></script>
+</body>
+</html>
